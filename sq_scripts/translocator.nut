@@ -60,5 +60,104 @@ class Translocator extends SqRootScript
         // causes weirdness for player movement, and particularly allows falling
         // interruption exploit.
         //Physics.SetVelocity(player, vector(0.0, 0.0, 0.0));
+
+        // ISSUE: player can end up inside an object after translocating, and we
+        // cannot detect this with ValidPos() which only cares about terrain; nor
+        // with Phys() messages, because they only occur on edges, not steady states.
     }
+}
+
+
+class DebugPhysics extends SqRootScript
+{
+    function OnBeginScript() {
+        print("Script begin");
+        local messages = 0x01F0;
+        Physics.SubscribeMsg(self, ePhysScriptMsgType.kCollisionMsg);
+        Physics.SubscribeMsg(self, ePhysScriptMsgType.kContactMsg);
+        Physics.SubscribeMsg(self, ePhysScriptMsgType.kEnterExitMsg);
+
+    }
+
+    function OnEndScript() {
+        print("Script emd");
+        local messages = 0x01F0;
+        Physics.UnsubscribeMsg(self, ePhysScriptMsgType.kCollisionMsg);
+        Physics.UnsubscribeMsg(self, ePhysScriptMsgType.kContactMsg);
+        Physics.UnsubscribeMsg(self, ePhysScriptMsgType.kEnterExitMsg);
+    }
+
+    function OnPhysCollision() {
+        print(Object.GetName(self) + ": " + message().message);
+    }
+
+    function OnPhysContactCreate() {
+        print(Object.GetName(self) + ": " + message().message);
+    }
+
+    function OnPhysContactDestroy() {
+        print(Object.GetName(self) + ": " + message().message);
+    }
+
+    function OnPhysEnter() {
+        print(Object.GetName(self) + ": " + message().message);
+    }
+
+    function OnPhysExit() {
+        print(Object.GetName(self) + ": " + message().message);
+    }
+}
+
+class TransGarrett extends DebugPhysics
+{
+    // function OnBeginScript() {
+    //     print("Script begin");
+    //     local messages = 0x01F0;
+    //     Physics.SubscribeMsg(self, messages);
+    // }
+
+    // function OnEndScript() {
+    //     print("Script emd");
+    //     local messages = 0x01F0;
+    //     Physics.UnsubscribeMsg(self, messages);
+    // }
+
+    // function OnPhysCollision() {
+    //     print(message().message);
+    // }
+
+    // function OnPhysContactCreate() {
+    //     print(message().message);
+    // }
+
+    // function OnPhysContactDestroy() {
+    //     print(message().message);
+    // }
+
+    // function OnPhysEnter() {
+    //     print(message().message);
+    // }
+
+    // function OnPhysExit() {
+    //     print(message().message);
+    // }
+/*
+// Messages: "PhysFellAsleep", "PhysWokeUp", "PhysMadePhysical", "PhysMadeNonPhysical", "PhysCollision",
+//           "PhysContactCreate", "PhysContactDestroy", "PhysEnter", "PhysExit"
+class sPhysMsg extends sScrMsg
+{
+   const int Submod;
+   const ePhysCollisionType collType;
+   const ObjID collObj;
+   const int collSubmod;
+   const float collMomentum;
+   const vector collNormal;
+   const vector collPt;
+   const ePhysContactType contactType;
+   const ObjID contactObj;
+   const int contactSubmod;
+   const ObjID transObj;
+   const int transSubmod;
+}
+*/
 }
