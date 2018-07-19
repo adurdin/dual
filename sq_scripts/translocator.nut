@@ -56,5 +56,9 @@ class Translocator extends SqRootScript
         }
         // BUG: if player is abutting a wall to his East, then after teleporting,
         // he can't walk East again. Find some way to break contacts or whatever.
+        // NOTE: the following line seems to work around the bug, but obviously
+        // causes weirdness for player movement, and particularly allows falling
+        // interruption exploit.
+        //Physics.SetVelocity(player, vector(0.0, 0.0, 0.0));
     }
 }
