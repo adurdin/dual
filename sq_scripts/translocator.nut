@@ -40,11 +40,21 @@ local Transloc = {
 
 class Translocator extends SqRootScript
 {
+
     function OnFrobInvEnd() {
         local player = Object.Named("Player");
         local pos = Object.Position(player);
         local facing = Object.Facing(player);
         local new_pos = Transloc.AlternateWorldPosition(pos);
-        Object.Teleport(player, new_pos, facing); // FIXME: include ref_frame?
+        // FIXME: consider using ref_frame arg and reference objects for the worlds.
+        Object.Teleport(player, new_pos, facing);
+        // Undo the teleport if we end up in a bad spot.
+        if (! Physics.ValidPos(player)) {
+            print("Would-be player position invalid at " + new_pos);
+            Object.Teleport(player, pos, facing);
+            Sound.PlayVoiceOver(player, "gardrop");
+        }
+        // BUG: if player is abutting a wall to his East, then after teleporting,
+        // he can't walk East again. Find some way to break contacts or whatever.
     }
 }
