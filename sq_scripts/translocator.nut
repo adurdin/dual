@@ -21,6 +21,21 @@ local Transloc = {
         }
         throw ("No world found at position: " + pos);
     }
+
+    AlternateWorldIndex = function(world_index) {
+        if (world_index == 0) {
+            return 1;
+        } else {
+            return 0;
+        }
+    }
+
+    AlternateWorldPosition = function(pos) {
+        local world_index_a = WorldIndex(pos);
+        local world_index_b = AlternateWorldIndex(world_index_a);
+        local relative = (pos - _worlds[world_index_a].origin);
+        return _worlds[world_index_b].origin + relative;
+    }
 }
 
 class Translocator extends SqRootScript
@@ -28,7 +43,8 @@ class Translocator extends SqRootScript
     function OnFrobInvEnd() {
         local player = Object.Named("Player");
         local pos = Object.Position(player);
-        local world_index = Transloc.WorldIndex(pos);
-        print("Translocator says hello from world: " + world_index);
+        local facing = Object.Facing(player);
+        local new_pos = Transloc.AlternateWorldPosition(pos);
+        Object.Teleport(player, new_pos, facing); // FIXME: include ref_frame?
     }
 }
