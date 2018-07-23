@@ -128,6 +128,7 @@ class DebugPhysics extends SqRootScript
 class TransGarrett extends SqRootScript
 {
     probe = 0;
+    probe_test_timer = 0;
 
     function OnDarkGameModeChange() {
         // BUG: For whatever reason the Player doesn't get Sim messages! And BeginScript is too early
@@ -144,6 +145,19 @@ class TransGarrett extends SqRootScript
             probe = p;
         } else {
             probe = CreateProbe();
+        }
+
+        // FIXME: this timer probably won't work w.r.t savegames because of the above. No matter.
+        if (probe_test_timer == 0) {
+            probe_test_timer = SetOneShotTimer("TestProbe", 0.015);
+        }
+    }
+
+    function OnTimer()
+    {
+        if (message().name == "TestProbe") {
+            TestProbe();
+            probe_test_timer = SetOneShotTimer("TestProbe", 0.015)
         }
     }
 
@@ -323,6 +337,27 @@ enum ePhysContactType
         // Done.
         Object.EndCreate(obj);
         return obj;
+    }
+
+    function TestProbe() {
+        local player = Object.Named("Player");
+
+        // BUG: Updating the PhysDims property like this doesn't seem to work.
+        // Is that because player motions don't update the player's phys properties?
+        //
+        // BUG: Also the dimensions of at least one of the submodels is clearly wrong!
+        // Might have to copy some of the actual player physics from PhysCreateDefaultPlayer() in PHYSAPI.CPP
+        Property.CopyFrom(probe, "PhysDims", player);
+
+        //local pos = Object.Position(player) + vector(0.0, -8.0, 0.0);
+        //local facing = Object.Facing(player);
+        Object.Teleport(probe, vector(8.0, 0.0, 0.0), vector(0.0, 0.0, 0.0), player);
+        local valid = Physics.ValidPos(probe);
+        if (valid) {
+            Property.Set(probe, "ModelName", "", "garstd"); // garcrh?
+        } else {
+            Property.Set(probe, "ModelName", "", "playbox");
+        }
     }
 
 /*
