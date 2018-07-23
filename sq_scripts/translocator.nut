@@ -145,6 +145,8 @@ class TransGarrett extends SqRootScript
             probe = p;
         } else {
             probe = CreateProbe();
+
+            Debug.Command("cam_attach ", probe)
         }
 
         // FIXME: this timer probably won't work w.r.t savegames because of the above. No matter.
@@ -351,7 +353,7 @@ enum ePhysContactType
 
         //local pos = Object.Position(player) + vector(0.0, -8.0, 0.0);
         //local facing = Object.Facing(player);
-        Object.Teleport(probe, vector(8.0, 0.0, 0.0), vector(0.0, 0.0, 0.0), player);
+        Object.Teleport(probe, vector(-8.0, 0.0, 2.0), vector(0.0, 0.0, 0.0), player);
         local valid = Physics.ValidPos(probe);
         if (valid) {
             Property.Set(probe, "ModelName", "", "garstd"); // garcrh?
