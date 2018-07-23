@@ -46,24 +46,40 @@ class Translocator extends SqRootScript
         local pos = Object.Position(player);
         local facing = Object.Facing(player);
         local new_pos = Transloc.AlternateWorldPosition(pos);
+
         // FIXME: consider using ref_frame arg and reference objects for the worlds.
+        // Would allow better determination of where we are without hardcoding numbers.
+
         Object.Teleport(player, new_pos, facing);
-        // Undo the teleport if we end up in a bad spot.
+        // Undo the teleport if we end up inside terrain.
+        // FIXME: consider using a probe object first so we don't have to move the player
         if (! Physics.ValidPos(player)) {
             print("Would-be player position invalid at " + new_pos);
             Object.Teleport(player, pos, facing);
             Sound.PlayVoiceOver(player, "gardrop");
         }
-        // BUG: if player is abutting a wall to his East, then after teleporting,
-        // he can't walk East again. Find some way to break contacts or whatever.
-        // NOTE: the following line seems to work around the bug, but obviously
-        // causes weirdness for player movement, and particularly allows falling
-        // interruption exploit.
-        //Physics.SetVelocity(player, vector(0.0, 0.0, 0.0));
+
+        // BUG: If player is abutting a wall to their East, then after teleporting,
+        // they can't walk East again. Seems that teleporting the player doesn't
+        // necessarily break physics contacts! (May also happen for other walls,
+        // but is reliably reproducible with Eastern walls / objects.)
+        //
+        // SOLUTION: Setting the player's velocity seems to force contacts to be
+        // re-evaluated, breaking the problematic contact. So we set it to what
+        // it already is so that we don't interrupt their running/falling/whatever.
+        //
+        // FIXME: only do this if we actually did teleport
+        local vel = vector();
+        Physics.GetVelocity(player, vel);
+        Physics.SetVelocity(player, vel);
 
         // ISSUE: player can end up inside an object after translocating, and we
         // cannot detect this with ValidPos() which only cares about terrain; nor
         // with Phys() messages, because they only occur on edges, not steady states.
+        //
+        // POSSIBLE WOKAROUND: when sim starts, scrape a list of all large-ish
+        // immovable objects, get their positions, facings, and bounds, and store that.
+        // Then query against that before teleporting to see if it should be allowed.
     }
 }
 
@@ -108,39 +124,112 @@ class DebugPhysics extends SqRootScript
     }
 }
 
-class TransGarrett extends DebugPhysics
+class TransGarrett extends SqRootScript
 {
-    // function OnBeginScript() {
-    //     print("Script begin");
-    //     local messages = 0x01F0;
-    //     Physics.SubscribeMsg(self, messages);
-    // }
+    function OnBeginScript() {
+        Physics.SubscribeMsg(self, ePhysScriptMsgType.kCollisionMsg);
+        Physics.SubscribeMsg(self, ePhysScriptMsgType.kContactMsg);
+        Physics.SubscribeMsg(self, ePhysScriptMsgType.kEnterExitMsg);
 
-    // function OnEndScript() {
-    //     print("Script emd");
-    //     local messages = 0x01F0;
-    //     Physics.UnsubscribeMsg(self, messages);
-    // }
+    }
 
-    // function OnPhysCollision() {
-    //     print(message().message);
-    // }
+    function OnEndScript() {
+        Physics.UnsubscribeMsg(self, ePhysScriptMsgType.kCollisionMsg);
+        Physics.UnsubscribeMsg(self, ePhysScriptMsgType.kContactMsg);
+        Physics.UnsubscribeMsg(self, ePhysScriptMsgType.kEnterExitMsg);
+    }
 
-    // function OnPhysContactCreate() {
-    //     print(message().message);
-    // }
+    function OnPhysCollision() {
+        local m = message();
 
-    // function OnPhysContactDestroy() {
-    //     print(message().message);
-    // }
+        // Find out what we're colliding with
+        local type;
+        local objectName;
+        if (m.collType == ePhysCollisionType.kCollNone) {
+            type = "None";
+            objectName = "";
+        } else if (m.collType == ePhysCollisionType.kCollTerrain) {
+            type = "Terrain";
+            objectName = "" + m.collObj;
+        } else if (m.collType == ePhysCollisionType.kCollObject) {
+            type = "Object";
+            objectName = "'" + Object.GetName(m.collObj) + "' (" + m.collObj + ")";
+        }
+        print("Collision in submodel " + m.Submod + " with " + type + " " + objectName);
 
-    // function OnPhysEnter() {
-    //     print(message().message);
-    // }
+        // Find out the parameters of the collision
+        print("  at: " + m.collPt + ", normal: " + m.collNormal + ", momentum: " + m.collMomentum);
+    }
 
-    // function OnPhysExit() {
-    //     print(message().message);
-    // }
+    function OnPhysContactCreate() {
+        local m = message();
+
+        // Find out what we're contacting
+        local type;
+        local objectName = "'" + Object.GetName(m.contactObj) + "' (" + m.contactObj + ")";
+
+        if (m.contactType == ePhysContactType.kContactNone) {
+            type = "None";
+        } else if (m.contactType == ePhysContactType.kContactFace) {
+            type = "Face";
+        } else if (m.contactType == ePhysContactType.kContactEdge) {
+            type = "Edge";
+        } else if (m.contactType == ePhysContactType.kContactVertex) {
+            type = "Vertex";
+        } else if (m.contactType == ePhysContactType.kContactSphere) {
+            type = "Sphere";
+        } else if (m.contactType == ePhysContactType.kContactSphereHat) {
+            type = "SphereHat";
+        } else if (m.contactType == ePhysContactType.kContactOBB) {
+            type = "OBB";
+        }
+
+        print("Create contact with " + objectName + " " + type + " submodel " + m.contactSubmod);
+    }
+
+    function OnPhysContactDestroy() {
+        local m = message();
+
+        // Find out what we're contacting
+        local type;
+        local objectName = "'" + Object.GetName(m.contactObj) + "' (" + m.contactObj + ")";
+
+        if (m.contactType == ePhysContactType.kContactNone) {
+            type = "None";
+        } else if (m.contactType == ePhysContactType.kContactFace) {
+            type = "Face";
+        } else if (m.contactType == ePhysContactType.kContactEdge) {
+            type = "Edge";
+        } else if (m.contactType == ePhysContactType.kContactVertex) {
+            type = "Vertex";
+        } else if (m.contactType == ePhysContactType.kContactSphere) {
+            type = "Sphere";
+        } else if (m.contactType == ePhysContactType.kContactSphereHat) {
+            type = "SphereHat";
+        } else if (m.contactType == ePhysContactType.kContactOBB) {
+            type = "OBB";
+        }
+
+        print("Destroy contact with " + objectName + " " + type + " submodel " + m.contactSubmod);
+    }
+
+    function OnPhysEnter() {
+        local m = message();
+
+        // Find out what we're entering
+        local objectName = "'" + Object.GetName(m.transObj) + "' (" + m.transObj + ")";
+
+        print("Enter " + objectName + " submodel " + m.transSubmod);
+    }
+
+    function OnPhysExit() {
+        local m = message();
+
+        // Find out what we're exiting
+        local objectName = "'" + Object.GetName(m.transObj) + "' (" + m.transObj + ")";
+
+        print("Exit " + objectName + " submodel " + m.transSubmod);
+    }
 /*
 // Messages: "PhysFellAsleep", "PhysWokeUp", "PhysMadePhysical", "PhysMadeNonPhysical", "PhysCollision",
 //           "PhysContactCreate", "PhysContactDestroy", "PhysEnter", "PhysExit"
@@ -159,5 +248,32 @@ class sPhysMsg extends sScrMsg
    const ObjID transObj;
    const int transSubmod;
 }
+enum ePhysMessageResult
+{
+    kPM_StatusQuo
+    kPM_Nothing
+    kPM_Bounce
+    kPM_Slay
+    kPM_NonPhys
+}
+
+enum ePhysCollisionType
+{
+    kCollNone
+    kCollTerrain
+    kCollObject
+}
+
+enum ePhysContactType
+{
+    kContactNone
+    kContactFace
+    kContactEdge
+    kContactVertex
+    kContactSphere
+    kContactSphereHat
+    kContactOBB
+}
+
 */
 }
