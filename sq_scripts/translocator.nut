@@ -51,6 +51,29 @@ class Translocator extends SqRootScript
         // Would allow better determination of where we are without hardcoding numbers.
 
         Object.Teleport(player, new_pos, facing);
+
+        // What does Physics.PlayerMotionSetOffset(int subModel, vector & offset); do??
+        // Well, I _could_ use it to force the player's movable sphere back to its default
+        // position (thus avoiding lean issues). Hmm...
+        //
+        // I could use that for the teleport / cam, but not for probing as you walk around (for
+        // showing feedback directly on the translocator device, for example).
+        // 
+        // ON THE OTHER HAND... if I use that for the TP, then the probe will actually correctly indicate
+        // a preview for the actual TP/cam.
+        //
+        // BUT: This still won't handle crouch whatsoever--and we really need a crouch-sized probe then.
+        /*
+        // TEST: try resetting the head position
+        // BUG: doesn't support crouch yet
+        const PLAYER_HEAD = 0;
+        const PLAYER_RADIUS = 1.2;
+        const PLAYER_HEIGHT = 6.0;
+        local PLAYER_HEAD_POS = ((PLAYER_HEIGHT / 2) - PLAYER_RADIUS);
+        local offset = vector(0, 0, PLAYER_HEAD_POS);
+        Physics.PlayerMotionSetOffset(PLAYER_HEAD, offset);
+        */
+
         // Undo the teleport if we end up inside terrain.
         // FIXME: consider using a probe object first so we don't have to move the player
         if (! Physics.ValidPos(player)) {
@@ -145,8 +168,6 @@ class TransGarrett extends SqRootScript
             probe = p;
         } else {
             probe = CreateProbe();
-
-            Debug.Command("cam_attach ", probe)
         }
 
         // FIXME: this timer probably won't work w.r.t savegames because of the above. No matter.
@@ -353,7 +374,7 @@ enum ePhysContactType
 
         //local pos = Object.Position(player) + vector(0.0, -8.0, 0.0);
         //local facing = Object.Facing(player);
-        Object.Teleport(probe, vector(-8.0, 0.0, 2.0), vector(0.0, 0.0, 0.0), player);
+        Object.Teleport(probe, vector(8.0, 0.0, 0.0), vector(0.0, 0.0, 0.0), player);
         local valid = Physics.ValidPos(probe);
         if (valid) {
             Property.Set(probe, "ModelName", "", "garstd"); // garcrh?
