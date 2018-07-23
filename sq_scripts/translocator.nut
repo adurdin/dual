@@ -72,6 +72,9 @@ class Translocator extends SqRootScript
         local PLAYER_HEAD_POS = ((PLAYER_HEIGHT / 2) - PLAYER_RADIUS);
         local offset = vector(0, 0, PLAYER_HEAD_POS);
         Physics.PlayerMotionSetOffset(PLAYER_HEAD, offset);
+
+        // recorded offsets from property: 0, 0, 1.8; 0, 0, -3.0 [didn't update for crouch]
+
         */
 
         // Undo the teleport if we end up inside terrain.
@@ -171,9 +174,26 @@ class TransGarrett extends SqRootScript
         }
 
         // FIXME: this timer probably won't work w.r.t savegames because of the above. No matter.
+        // FIXME: also the interval means we run the script much too often; we really don't need to.
         if (probe_test_timer == 0) {
             probe_test_timer = SetOneShotTimer("TestProbe", 0.015);
         }
+
+
+        //local offset1 = Property.Get(player, "PhysDims", "Offset 1");
+        //local offset2 = Property.Get(player, "PhysDims", "Offset 2");
+        //print("Player submodel 0 offset: " + offset1 + ", submodel 1 offset: " + offset2);
+        // HAHA: Setting the Y of the player head offset to 4.0 makes Garrett really tall!
+        // and setting it to 0 makes him really short! Buuuuut it resets after mantling (and
+        // possibly other actions too, haven't tested thoroughly).
+        //local offset1 = vector(0.0, 0.0, 4.0);
+        //Property.Set(self, "PhysDims", "Offset 1", offset1);
+
+
+        // Okay: possible approach
+        // Two 0-sized objects, DetailAttached to Garrett: one to his head, one to his body.
+        // Then can measure their positions, relative to Garrett's position, to get actual
+        // locations of head/body spheres due to crouch/walk/lean etc.
     }
 
     function OnTimer()
@@ -342,6 +362,11 @@ enum ePhysContactType
         // The probe must have the same physics models as the player.
         local player = Object.Named("Player");
         Property.CopyFrom(obj, "PhysType", player);
+        // BUG: copying PhysDims from the player does not correctly copy all the submodel
+        // dimensions. It gets head and feet right, but the others are all default radius and offset.
+        //
+        // POSSIBLE WORKAROUND: use 2 or 3 probe objects, each with 1 or 2 sphere submodels
+        // reflecting the various player submodels (1 probe could have head; 1 could have body + feet?)
         Property.CopyFrom(obj, "PhysDims", player);
 
         // The probe should not collide with anything though.
