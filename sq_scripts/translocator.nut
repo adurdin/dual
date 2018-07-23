@@ -80,9 +80,10 @@ class Translocator extends SqRootScript
         // POSSIBLE WOKAROUND: when sim starts, scrape a list of all large-ish
         // immovable objects, get their positions, facings, and bounds, and store that.
         // Then query against that before teleporting to see if it should be allowed.
+
+        // TODO: need to explore translocation while crouched, leaning, etc.
     }
 }
-
 
 class DebugPhysics extends SqRootScript
 {
@@ -126,11 +127,30 @@ class DebugPhysics extends SqRootScript
 
 class TransGarrett extends SqRootScript
 {
+    probe = 0;
+
+    function OnDarkGameModeChange() {
+        // BUG: For whatever reason the Player doesn't get Sim messages! And BeginScript is too early
+        // for creating the probe.
+        //
+        // WORKAROUND: Use DarkGameModeChange and keep track of if we've already created the probe.
+        // Note that this will also fire when ending the level and just before a reload, but those
+        // cases will just find the existing probe, so probably nothing to worry about.
+        //
+        // TODO: The probe should probably be owned by the translocator itself tbh.
+        local p = Object.Named("PlayerTransProbe");
+        if (p != 0) {
+            // Probe already exists (usually because loading a saved game)
+            probe = p;
+        } else {
+            probe = CreateProbe();
+        }
+    }
+
     function OnBeginScript() {
         Physics.SubscribeMsg(self, ePhysScriptMsgType.kCollisionMsg);
         Physics.SubscribeMsg(self, ePhysScriptMsgType.kContactMsg);
         Physics.SubscribeMsg(self, ePhysScriptMsgType.kEnterExitMsg);
-
     }
 
     function OnEndScript() {
@@ -276,4 +296,44 @@ enum ePhysContactType
 }
 
 */
+
+    function CreateProbe()
+    {
+        local obj = Object.BeginCreate(Object.Named("Object"));
+        Object.SetName(obj, "PlayerTransProbe");
+
+        // The probe must have the same physics models as the player.
+        local player = Object.Named("Player");
+        Property.CopyFrom(obj, "PhysType", player);
+        Property.CopyFrom(obj, "PhysDims", player);
+
+        // The probe should not collide with anything though.
+        Property.Set(obj, "CollisionType", "", 0);
+        Property.Set(obj, "PhysAIColl", "", false);
+    
+        // The probe starts at the origin.
+        Object.Teleport(obj, vector(0,0,0), vector(0,0,0), 0);
+        Physics.ControlCurrentPosition(obj);
+    
+        // For the sake of visibility while developing, give it a player box model.
+        Property.Set(obj, "ModelName", "", "playbox");
+        const kRenderTypeNormal = 0;
+        Property.Set(obj, "RenderType", "", kRenderTypeNormal);
+    
+        // Done.
+        Object.EndCreate(obj);
+        return obj;
+    }
+
+/*
+    function Probe(pos, facing) {
+        // Update physics submodels
+        Property.CopyFrom(self, "PhysDims", player);
+        Object.Teleport(self, pos, facing, 0);
+        local valid = Physics.ValidPos(self);
+        Object.Teleport(self, vector(0, 0, 0), vector(0, 0, 0));
+        
+    }
+*/
+
 }
