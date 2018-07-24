@@ -77,9 +77,10 @@ class Translocator extends SqRootScript
 
     function OnFrobInvEnd() {
         local frob_duration = message().Sec;
-        DarkUI.TextMessage("Frob duration: " + frob_duration);
         if (frob_duration < frob_max_duration) {
-            // FIXME: should preview translocation
+            // Preview where we would translocate to if frobbed for a moment.
+            local player = Object.Named("Player");
+            SendMessage(player, "Transview");
         } else {
             // Translocate if we frobbed for a while.
             local player = Object.Named("Player");
@@ -176,6 +177,25 @@ class TransGarrett extends SqRootScript
         */
     }
 
+    function OnTransview() {
+        local player = self;
+        local pos = Object.Position(player);
+        local facing = Object.Facing(player);
+        local new_pos = Transloc.AlternateWorldPosition(pos);
+        local valid = Probe(new_pos);
+
+        // ISSUE: same collision issues as Translocate()
+
+        if (valid) {
+            OrientProbeToCamera(head_probe);
+            Camera.DynamicAttach(head_probe);
+            Sound.PlayVoiceOver(player, "blue_light_on");
+        } else /* ! valid */ {
+            // Transviewing now would put the camera inside a wall or something. That's not great.
+            Sound.PlayVoiceOver(player, "blue_light_off");
+        }
+    }
+
     function OnTranslocate() {
         local player = self;
         local pos = Object.Position(player);
@@ -238,6 +258,24 @@ class TransGarrett extends SqRootScript
         Object.Teleport(probe, probe_pos, vector(0, 0, 0), 0);
         local valid = Physics.ValidPos(probe);
         return valid;
+    }
+
+    function OrientProbeToCamera(probe) {
+        local pos = Object.Position(probe);
+        local facing = Camera.GetFacing();
+
+        // BUG: When using Camera.DynamicAttach to a probe, the rotation of the probe's
+        // facing seems to end up doubled. Perhaps bug relating to the FOV change?
+        // (Note that this affects CamGrenades too, but since they're thrown, their
+        // initial orientation is somewhat random anyway, so who would notice?)
+        //
+        // WORKAROUND: Halve each component of the camera's facing so the transview
+        // cameras is looking the same way as the player was when activating it.
+        facing.x /= 2.0;
+        facing.y /= 2.0;
+        facing.z /= 2.0;
+
+        Object.Teleport(probe, pos, facing, 0);
     }
 
     function OnTimer()
