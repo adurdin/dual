@@ -154,7 +154,12 @@ class DebugPhysics extends SqRootScript
 class TransGarrett extends SqRootScript
 {
     probe = 0;
-    probe_test_timer = 0;
+    head_marker = 0;
+    foot_marker = 0;
+    body_marker = 0;
+    autoprobe_name = "AutoProbe";
+    autoprobe_period = 1.0; //0.015;
+    autoprobe_timer = 0;
 
     function OnDarkGameModeChange() {
         // BUG: For whatever reason the Player doesn't get Sim messages! And BeginScript is too early
@@ -170,13 +175,17 @@ class TransGarrett extends SqRootScript
             // Probe already exists (usually because loading a saved game)
             probe = p;
         } else {
-            probe = CreateProbe();
+            local player = Object.Named("Player");
+            probe = CreateProbe(player);
+            head_marker = CreateSubmodelMarker(player, 0);
+            foot_marker = CreateSubmodelMarker(player, 1);
+            body_marker = CreateSubmodelMarker(player, 2);
         }
 
         // FIXME: this timer probably won't work w.r.t savegames because of the above. No matter.
         // FIXME: also the interval means we run the script much too often; we really don't need to.
-        if (probe_test_timer == 0) {
-            probe_test_timer = SetOneShotTimer("TestProbe", 0.015);
+        if (autoprobe_timer == 0) {
+            autoprobe_timer = SetOneShotTimer(autoprobe_name, autoprobe_period);
         }
 
 
@@ -198,9 +207,14 @@ class TransGarrett extends SqRootScript
 
     function OnTimer()
     {
-        if (message().name == "TestProbe") {
+        if (message().name == autoprobe_name) {
+            local pos = Object.Position(self);
+            local head_pos = Object.Position(head_marker) - pos;
+            local foot_pos = Object.Position(foot_marker) - pos;
+            local body_pos = Object.Position(body_marker) - pos;
+            print("Head: " + head_pos + "   Foot: " + foot_pos.z + "   Body: " + body_pos.z);
             TestProbe();
-            probe_test_timer = SetOneShotTimer("TestProbe", 0.015)
+            autoprobe_timer = SetOneShotTimer(autoprobe_name, autoprobe_period)
         }
     }
 
@@ -354,13 +368,12 @@ enum ePhysContactType
 
 */
 
-    function CreateProbe()
+    function CreateProbe(player)
     {
         local obj = Object.BeginCreate(Object.Named("Object"));
         Object.SetName(obj, "PlayerTransProbe");
 
         // The probe must have the same physics models as the player.
-        local player = Object.Named("Player");
         Property.CopyFrom(obj, "PhysType", player);
         // BUG: copying PhysDims from the player does not correctly copy all the submodel
         // dimensions. It gets head and feet right, but the others are all default radius and offset.
@@ -384,6 +397,20 @@ enum ePhysContactType
     
         // Done.
         Object.EndCreate(obj);
+        return obj;
+    }
+
+    function CreateSubmodelMarker(target, submodel)
+    {
+        local obj = Object.Create(Object.Named("Marker"));
+
+        // Attach it to the appropriate submodel of the target
+        local link = Link.Create("DetailAttachement", obj, target);
+        LinkTools.LinkSetData(link, "Type", 3);
+        LinkTools.LinkSetData(link, "vhot/sub #", submodel);
+        LinkTools.LinkSetData(link, "rel pos", vector(0.0, 0.0, 0.0));
+        LinkTools.LinkSetData(link, "rel rot", vector(0.0, 0.0, 0.0));
+    
         return obj;
     }
 
