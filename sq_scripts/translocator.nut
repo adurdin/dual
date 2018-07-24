@@ -295,6 +295,9 @@ class TransGarrett extends SqRootScript
         } else {
             attach_camera_to = probe;
 
+            // NOTE: Can customise camera/camovl.txt somewhat to adjust the appearance of the
+            // lens overlay to be more suitable. But the remote camera FOV is hard-coded.
+
             // BUG: When using Camera.DynamicAttach to a probe, the rotation of the probe's
             // facing seems to end up doubled. Perhaps bug relating to the FOV change?
             // (Note that this affects CamGrenades too, but since they're thrown, their
