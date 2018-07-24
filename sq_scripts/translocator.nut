@@ -1,4 +1,8 @@
 local Transloc = {
+    // FIXME: consider using ref_frame arg and reference objects for the worlds.
+    // Would allow better determination of where we are without hardcoding numbers.
+    // World reference objects could be linked to the TranslocationMagic object.
+
     // Worlds must be spread out on the Y axis, and aligned on the X and Z axis.
     _worlds = [
         {
@@ -43,73 +47,7 @@ class Translocator extends SqRootScript
 
     function OnFrobInvEnd() {
         local player = Object.Named("Player");
-        local pos = Object.Position(player);
-        local facing = Object.Facing(player);
-        local new_pos = Transloc.AlternateWorldPosition(pos);
-
-        // FIXME: consider using ref_frame arg and reference objects for the worlds.
-        // Would allow better determination of where we are without hardcoding numbers.
-
-        Object.Teleport(player, new_pos, facing);
-
-        // What does Physics.PlayerMotionSetOffset(int subModel, vector & offset); do??
-        // Well, I _could_ use it to force the player's movable sphere back to its default
-        // position (thus avoiding lean issues). Hmm...
-        //
-        // I could use that for the teleport / cam, but not for probing as you walk around (for
-        // showing feedback directly on the translocator device, for example).
-        // 
-        // ON THE OTHER HAND... if I use that for the TP, then the probe will actually correctly indicate
-        // a preview for the actual TP/cam.
-        //
-        // BUT: This still won't handle crouch whatsoever--and we really need a crouch-sized probe then.
-        /*
-        // TEST: try resetting the head position
-        // BUG: doesn't support crouch yet
-        const PLAYER_HEAD = 0;
-        const PLAYER_RADIUS = 1.2;
-        const PLAYER_HEIGHT = 6.0;
-        local PLAYER_HEAD_POS = ((PLAYER_HEIGHT / 2) - PLAYER_RADIUS);
-        local offset = vector(0, 0, PLAYER_HEAD_POS);
-        Physics.PlayerMotionSetOffset(PLAYER_HEAD, offset);
-
-        // recorded offsets from property: 0, 0, 1.8; 0, 0, -3.0 [didn't update for crouch]
-
-        */
-
-        // Undo the teleport if we end up inside terrain.
-        // FIXME: consider using a probe object first so we don't have to move the player
-        if (! Physics.ValidPos(player)) {
-            print("Would-be player position invalid at " + new_pos);
-            Object.Teleport(player, pos, facing);
-            Sound.PlayVoiceOver(player, "blue_light_off");
-        } else {
-            Sound.PlayVoiceOver(player, "blue_light_on");
-        }
-
-        // BUG: If player is abutting a wall to their East, then after teleporting,
-        // they can't walk East again. Seems that teleporting the player doesn't
-        // necessarily break physics contacts! (May also happen for other walls,
-        // but is reliably reproducible with Eastern walls / objects.)
-        //
-        // SOLUTION: Setting the player's velocity seems to force contacts to be
-        // re-evaluated, breaking the problematic contact. So we set it to what
-        // it already is so that we don't interrupt their running/falling/whatever.
-        //
-        // FIXME: only do this if we actually did teleport
-        local vel = vector();
-        Physics.GetVelocity(player, vel);
-        Physics.SetVelocity(player, vel);
-
-        // ISSUE: player can end up inside an object after translocating, and we
-        // cannot detect this with ValidPos() which only cares about terrain; nor
-        // with Phys() messages, because they only occur on edges, not steady states.
-        //
-        // POSSIBLE WOKAROUND: when sim starts, scrape a list of all large-ish
-        // immovable objects, get their positions, facings, and bounds, and store that.
-        // Then query against that before teleporting to see if it should be allowed.
-
-        // TODO: need to explore translocation while crouched, leaning, etc.
+        SendMessage(player, "Translocate");
     }
 }
 
@@ -160,41 +98,61 @@ class TransGarrett extends SqRootScript
         foot_probe = GetSphereProbe("PlayerFootProbe", 0.0);
 
 
+        /*
         // FIXME: this timer probably won't work w.r.t savegames because of the above. No matter.
         // FIXME: also the interval means we run the script much too often; we really don't need to.
+        //
+        // FIX: Put a Tweq/Flicker on the Translocator (enabled when contained by a Player), have it
+        // send a message to the TranslocationMagic object, and use the return value to update the
+        // Translocator's appearance.
         if (autoprobe_timer == 0) {
             autoprobe_timer = SetOneShotTimer(autoprobe_name, autoprobe_period);
         }
-
-
-        //local offset1 = Property.Get(player, "PhysDims", "Offset 1");
-        //local offset2 = Property.Get(player, "PhysDims", "Offset 2");
-        //print("Player submodel 0 offset: " + offset1 + ", submodel 1 offset: " + offset2);
-        // HAHA: Setting the Y of the player head offset to 4.0 makes Garrett really tall!
-        // and setting it to 0 makes him really short! Buuuuut it resets after mantling (and
-        // possibly other actions too, haven't tested thoroughly).
-        //local offset1 = vector(0.0, 0.0, 4.0);
-        //Property.Set(self, "PhysDims", "Offset 1", offset1);
+        */
     }
 
-    function TestProbe() {
-        local player = Object.Named("Player");
-        local player_pos = Object.Position(player);
+    function OnTranslocate() {
+        local player = self;
+        local pos = Object.Position(player);
+        local facing = Object.Facing(player);
+        local new_pos = Transloc.AlternateWorldPosition(pos);
+        local valid = Probe(new_pos);
 
-        local probe_pos = player_pos + vector(8.0, 0.0, 0.0);
-        local valid = Probe(probe_pos);
-        if (! valid) {
-            print("Not valid");
+        // ISSUE: player can translocate as fast as they can mash the button.
+        // FIX: add some kind of delay in here.
+
+        // ISSUE: player can end up inside an object after translocating, and we
+        // cannot detect this with ValidPos() which only cares about terrain; nor
+        // with Phys() messages, because they only occur on edges, not steady states.
+        //
+        // POSSIBLE WOKAROUND: when sim starts, scrape a list of all large-ish
+        // immovable objects, get their positions, facings, and bounds, and store that.
+        // Then query against that before teleporting to see if it should be allowed.
+
+        if (valid) {
+            Object.Teleport(player, new_pos, facing);
+            Sound.PlayVoiceOver(player, "blue_light_on");
+
+            // BUG: If player is abutting a wall to their East, then after teleporting,
+            // they can't walk East again. Seems that teleporting the player doesn't
+            // necessarily break physics contacts! (May also happen for other walls,
+            // but is reliably reproducible with Eastern walls / objects.)
+            //
+            // SOLUTION: Setting the player's velocity seems to force contacts to be
+            // re-evaluated, breaking the problematic contact. So we set it to what
+            // it already is so that we don't interrupt their running/falling/whatever.
+            local vel = vector();
+            Physics.GetVelocity(player, vel);
+            Physics.SetVelocity(player, vel);
+
+        } else /* ! valid */ {
+            // Translocating now would put us inside a wall or something. That's not great.
+            Sound.PlayVoiceOver(player, "blue_light_off");
         }
-            // local pos = Object.Position(self);
-            // local head_pos = Object.Position(head_marker) - pos;
-            // local foot_pos = Object.Position(foot_marker) - pos;
-            // local body_pos = Object.Position(body_marker) - pos;
-            // print("Head: " + head_pos + "   Foot: " + foot_pos.z + "   Body: " + body_pos.z);
     }
 
     function Probe(pos) {
-        local player = Object.Named("Player");
+        local player = self;
         local player_pos = Object.Position(player);
         local valid = true;
         if (valid) { valid = valid && EvaluateSingleProbe(head_probe, pos, head_marker, player_pos); }
@@ -210,23 +168,11 @@ class TransGarrett extends SqRootScript
         return valid;
     }
 
-/*
-    function Probe(pos, facing) {
-        // Update physics submodels
-        Property.CopyFrom(self, "PhysDims", player);
-        Object.Teleport(self, pos, facing, 0);
-        local valid = Physics.ValidPos(self);
-        Object.Teleport(self, vector(0, 0, 0), vector(0, 0, 0));
-        
-    }
-*/
-
     function OnTimer()
     {
-        if (message().name == autoprobe_name) {
-            TestProbe();
-            autoprobe_timer = SetOneShotTimer(autoprobe_name, autoprobe_period)
-        }
+        // if (message().name == autoprobe_name) {
+        //     autoprobe_timer = SetOneShotTimer(autoprobe_name, autoprobe_period)
+        // }
     }
 
     function GetSphereProbe(name, radius)
