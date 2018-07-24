@@ -145,6 +145,13 @@ class TransGarrett extends SqRootScript
             Physics.GetVelocity(player, vel);
             Physics.SetVelocity(player, vel);
 
+            // BUG: If player translocates while in mid-mantle, they can still sometimes
+            // get stuck midair, and teleport back if they abort the mantle! I can replicate
+            // this most often with a wall to the player's South. This is an issue if I
+            // try to store which world the player is in with a variable, instead of by
+            // comparing player position to the reference points. Also an issue
+            // for player equipment, if I'm taking that away when translocating.
+
         } else /* ! valid */ {
             // Translocating now would put us inside a wall or something. That's not great.
             Sound.PlayVoiceOver(player, "blue_light_off");
