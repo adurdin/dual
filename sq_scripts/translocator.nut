@@ -82,7 +82,9 @@ class Translocator extends SqRootScript
         if (! Physics.ValidPos(player)) {
             print("Would-be player position invalid at " + new_pos);
             Object.Teleport(player, pos, facing);
-            Sound.PlayVoiceOver(player, "gardrop");
+            Sound.PlayVoiceOver(player, "blue_light_off");
+        } else {
+            Sound.PlayVoiceOver(player, "blue_light_on");
         }
 
         // BUG: If player is abutting a wall to their East, then after teleporting,
@@ -151,14 +153,30 @@ class DebugPhysics extends SqRootScript
     }
 }
 
+// All these are right out of PHYSAPI.H
+const PLAYER_HEAD = 0;
+const PLAYER_FOOT = 1;
+const PLAYER_BODY = 2;
+const PLAYER_KNEE = 3;
+const PLAYER_SHIN = 4;
+const PLAYER_RADIUS = 1.2;
+const PLAYER_HEIGHT = 6.0;
+// local PLAYER_HEAD_POS = ((PLAYER_HEIGHT / 2) - PLAYER_RADIUS);
+// local PLAYER_FOOT_POS = (-(PLAYER_HEIGHT / 2));
+// local PLAYER_BODY_POS = ((PLAYER_HEIGHT / 2) - (PLAYER_RADIUS * 3));
+// local PLAYER_KNEE_POS = (-(PLAYER_HEIGHT * (13.0 / 30.0)));
+// local PLAYER_SHIN_POS = (-(PLAYER_HEIGHT * (11.0 / 30.0)));
+
 class TransGarrett extends SqRootScript
 {
-    probe = 0;
     head_marker = 0;
     foot_marker = 0;
     body_marker = 0;
+    head_probe = 0;
+    body_probe = 0;
+    foot_probe = 0;
     autoprobe_name = "AutoProbe";
-    autoprobe_period = 1.0; //0.015;
+    autoprobe_period = 0.1;
     autoprobe_timer = 0;
 
     function OnDarkGameModeChange() {
@@ -168,19 +186,19 @@ class TransGarrett extends SqRootScript
         // WORKAROUND: Use DarkGameModeChange and keep track of if we've already created the probe.
         // Note that this will also fire when ending the level and just before a reload, but those
         // cases will just find the existing probe, so probably nothing to worry about.
-        //
-        // TODO: The probe should probably be owned by the translocator itself tbh.
-        local p = Object.Named("PlayerTransProbe");
-        if (p != 0) {
-            // Probe already exists (usually because loading a saved game)
-            probe = p;
-        } else {
-            local player = Object.Named("Player");
-            probe = CreateProbe(player);
-            head_marker = CreateSubmodelMarker(player, 0);
-            foot_marker = CreateSubmodelMarker(player, 1);
-            body_marker = CreateSubmodelMarker(player, 2);
-        }
+        // FIX: put the script on another "manager" type object, whose OnSim should have access to the player.
+
+        // Attach marker objects to submodels of the Player whose position we want to know.
+        local player = self;
+        head_marker = GetSubmodelMarker("PlayerHeadMarker", player, PLAYER_HEAD);
+        body_marker = GetSubmodelMarker("PlayerBodyMarker", player, PLAYER_BODY);
+        foot_marker = GetSubmodelMarker("PlayerFootMarker", player, PLAYER_FOOT);
+
+        // Create probe objects for collision tests prior to teleporting the player.
+        head_probe = GetSphereProbe("PlayerHeadProbe", PLAYER_RADIUS);
+        body_probe = GetSphereProbe("PlayerBodyProbe", PLAYER_RADIUS);
+        foot_probe = GetSphereProbe("PlayerFootProbe", 0.0);
+
 
         // FIXME: this timer probably won't work w.r.t savegames because of the above. No matter.
         // FIXME: also the interval means we run the script much too often; we really don't need to.
@@ -197,26 +215,61 @@ class TransGarrett extends SqRootScript
         // possibly other actions too, haven't tested thoroughly).
         //local offset1 = vector(0.0, 0.0, 4.0);
         //Property.Set(self, "PhysDims", "Offset 1", offset1);
-
-
-        // Okay: possible approach
-        // Two 0-sized objects, DetailAttached to Garrett: one to his head, one to his body.
-        // Then can measure their positions, relative to Garrett's position, to get actual
-        // locations of head/body spheres due to crouch/walk/lean etc.
     }
+
+    function TestProbe() {
+        local player = Object.Named("Player");
+        local player_pos = Object.Position(player);
+
+        local probe_pos = player_pos + vector(8.0, 0.0, 0.0);
+        local valid = Probe(probe_pos);
+        if (! valid) {
+            print("Not valid");
+        }
+            // local pos = Object.Position(self);
+            // local head_pos = Object.Position(head_marker) - pos;
+            // local foot_pos = Object.Position(foot_marker) - pos;
+            // local body_pos = Object.Position(body_marker) - pos;
+            // print("Head: " + head_pos + "   Foot: " + foot_pos.z + "   Body: " + body_pos.z);
+    }
+
+    function Probe(pos) {
+        local player = Object.Named("Player");
+        local player_pos = Object.Position(player);
+        local valid = true;
+        if (valid) { valid = valid && EvaluateSingleProbe(head_probe, pos, head_marker, player_pos); }
+        if (valid) { valid = valid && EvaluateSingleProbe(body_probe, pos, body_marker, player_pos); }
+        if (valid) { valid = valid && EvaluateSingleProbe(foot_probe, pos, foot_marker, player_pos); }
+        return valid;
+    }
+
+    function EvaluateSingleProbe(probe, probe_origin, marker, marker_origin) {
+        local probe_pos = probe_origin + (Object.Position(marker) - marker_origin);
+        Object.Teleport(probe, probe_pos, vector(0, 0, 0), 0);
+        local valid = Physics.ValidPos(probe);
+        return valid;
+    }
+
+/*
+    function Probe(pos, facing) {
+        // Update physics submodels
+        Property.CopyFrom(self, "PhysDims", player);
+        Object.Teleport(self, pos, facing, 0);
+        local valid = Physics.ValidPos(self);
+        Object.Teleport(self, vector(0, 0, 0), vector(0, 0, 0));
+        
+    }
+*/
 
     function OnTimer()
     {
         if (message().name == autoprobe_name) {
-            local pos = Object.Position(self);
-            local head_pos = Object.Position(head_marker) - pos;
-            local foot_pos = Object.Position(foot_marker) - pos;
-            local body_pos = Object.Position(body_marker) - pos;
-            print("Head: " + head_pos + "   Foot: " + foot_pos.z + "   Body: " + body_pos.z);
             TestProbe();
             autoprobe_timer = SetOneShotTimer(autoprobe_name, autoprobe_period)
         }
     }
+
+    ///////////////////////////////
 
     function OnBeginScript() {
         Physics.SubscribeMsg(self, ePhysScriptMsgType.kCollisionMsg);
@@ -368,41 +421,44 @@ enum ePhysContactType
 
 */
 
-    function CreateProbe(player)
+    function GetSphereProbe(name, radius)
     {
-        local obj = Object.BeginCreate(Object.Named("Object"));
-        Object.SetName(obj, "PlayerTransProbe");
+        local obj = Object.Named(name);
+        if (obj != 0) { return obj; }
 
-        // The probe must have the same physics models as the player.
-        Property.CopyFrom(obj, "PhysType", player);
-        // BUG: copying PhysDims from the player does not correctly copy all the submodel
-        // dimensions. It gets head and feet right, but the others are all default radius and offset.
-        //
-        // POSSIBLE WORKAROUND: use 2 or 3 probe objects, each with 1 or 2 sphere submodels
-        // reflecting the various player submodels (1 probe could have head; 1 could have body + feet?)
-        Property.CopyFrom(obj, "PhysDims", player);
+        obj = Object.BeginCreate(Object.Named("Object"));
+        Object.SetName(obj, name);
 
-        // The probe should not collide with anything though.
+        // Probes all have a single sphere
+        Property.Set(obj, "PhysType", "Type", 1);
+        Property.Set(obj, "PhysType", "# Submodels", 1);
+        Property.Set(obj, "PhysDims", "Radius 1", radius);
+        Property.Set(obj, "PhysDims", "Offset 1", vector(0.0, 0.0, 0.0));
+
+        // The probe must collide with anything but terrain.
         Property.Set(obj, "CollisionType", "", 0);
         Property.Set(obj, "PhysAIColl", "", false);
     
         // The probe starts at the origin.
         Object.Teleport(obj, vector(0,0,0), vector(0,0,0), 0);
-        Physics.ControlCurrentPosition(obj);
+        Physics.ControlCurrentLocation(obj);
+        Physics.ControlCurrentRotation(obj);
     
-        // For the sake of visibility while developing, give it a player box model.
-        Property.Set(obj, "ModelName", "", "playbox");
-        const kRenderTypeNormal = 0;
-        Property.Set(obj, "RenderType", "", kRenderTypeNormal);
+        // Probe should not be rendered
+        Property.Set(obj, "RenderType", "", 1);
     
         // Done.
         Object.EndCreate(obj);
         return obj;
     }
 
-    function CreateSubmodelMarker(target, submodel)
+    function GetSubmodelMarker(name, target, submodel)
     {
-        local obj = Object.Create(Object.Named("Marker"));
+        local obj = Object.Named(name);
+        if (obj != 0) { return obj; }
+
+        obj = Object.Create(Object.Named("Marker"));
+        Object.SetName(obj, name);
 
         // Attach it to the appropriate submodel of the target
         local link = Link.Create("DetailAttachement", obj, target);
@@ -413,37 +469,4 @@ enum ePhysContactType
     
         return obj;
     }
-
-    function TestProbe() {
-        local player = Object.Named("Player");
-
-        // BUG: Updating the PhysDims property like this doesn't seem to work.
-        // Is that because player motions don't update the player's phys properties?
-        //
-        // BUG: Also the dimensions of at least one of the submodels is clearly wrong!
-        // Might have to copy some of the actual player physics from PhysCreateDefaultPlayer() in PHYSAPI.CPP
-        Property.CopyFrom(probe, "PhysDims", player);
-
-        //local pos = Object.Position(player) + vector(0.0, -8.0, 0.0);
-        //local facing = Object.Facing(player);
-        Object.Teleport(probe, vector(8.0, 0.0, 0.0), vector(0.0, 0.0, 0.0), player);
-        local valid = Physics.ValidPos(probe);
-        if (valid) {
-            Property.Set(probe, "ModelName", "", "garstd"); // garcrh?
-        } else {
-            Property.Set(probe, "ModelName", "", "playbox");
-        }
-    }
-
-/*
-    function Probe(pos, facing) {
-        // Update physics submodels
-        Property.CopyFrom(self, "PhysDims", player);
-        Object.Teleport(self, pos, facing, 0);
-        local valid = Physics.ValidPos(self);
-        Object.Teleport(self, vector(0, 0, 0), vector(0, 0, 0));
-        
-    }
-*/
-
 }
