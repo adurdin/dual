@@ -131,6 +131,8 @@ const PLAYER_HEIGHT = 6.0;
 // local PLAYER_KNEE_POS = (-(PLAYER_HEIGHT * (13.0 / 30.0)));
 // local PLAYER_SHIN_POS = (-(PLAYER_HEIGHT * (11.0 / 30.0)));
 
+const FORCE_OBJ_ATTACH_MODE = false;
+
 class TransGarrett extends SqRootScript
 {
     head_marker = 0;
@@ -139,6 +141,7 @@ class TransGarrett extends SqRootScript
     head_probe = 0;
     body_probe = 0;
     foot_probe = 0;
+    head_cam = 0;
     autoprobe_name = "AutoProbe";
     autoprobe_period = 0.1;
     autoprobe_timer = 0;
@@ -163,6 +166,10 @@ class TransGarrett extends SqRootScript
         body_probe = GetSphereProbe("PlayerBodyProbe", PLAYER_RADIUS);
         foot_probe = GetSphereProbe("PlayerFootProbe", 0.0);
 
+        if (FORCE_OBJ_ATTACH_MODE) {
+            // Create marker object for remote cam.
+            head_cam = GetCamMarker("PlayerHeadCam");
+        }
 
         /*
         // FIXME: this timer probably won't work w.r.t savegames because of the above. No matter.
@@ -187,8 +194,7 @@ class TransGarrett extends SqRootScript
         // ISSUE: same collision issues as Translocate()
 
         if (valid) {
-            OrientProbeToCamera(head_probe);
-            Camera.DynamicAttach(head_probe);
+            AttachRemoteCameraTo(head_probe, head_cam);
             Sound.PlayVoiceOver(player, "blue_light_on");
         } else /* ! valid */ {
             // Transviewing now would put the camera inside a wall or something. That's not great.
@@ -260,22 +266,49 @@ class TransGarrett extends SqRootScript
         return valid;
     }
 
-    function OrientProbeToCamera(probe) {
+    function AttachRemoteCameraTo(probe, camera_marker) {
         local pos = Object.Position(probe);
         local facing = Camera.GetFacing();
+        local attach_camera_to;
 
-        // BUG: When using Camera.DynamicAttach to a probe, the rotation of the probe's
-        // facing seems to end up doubled. Perhaps bug relating to the FOV change?
-        // (Note that this affects CamGrenades too, but since they're thrown, their
-        // initial orientation is somewhat random anyway, so who would notice?)
-        //
-        // WORKAROUND: Halve each component of the camera's facing so the transview
-        // cameras is looking the same way as the player was when activating it.
-        facing.x /= 2.0;
-        facing.y /= 2.0;
-        facing.z /= 2.0;
+        if (FORCE_OBJ_ATTACH_MODE) {
+            // NOTE: The cam object no physics model, so when calling Camera.DynamicAttach,
+            // we get the OBJ_ATTACH camera mode instead of the normal REMOTE_CAM mode.
+            // But that's good, because OBJ_ATTACH mode doesn't do the flash when starting
+            // and ending, nor does it force the hard-coded remote cam FOV and lens overlay
+            // either!
+            // See camera.c:CameraRemote() and rend_loop.c:do_frame() for details.
+            attach_camera_to = camera_marker;
 
-        Object.Teleport(probe, pos, facing, 0);
+            // BUG: When forcing OBJ_ATTACH mode, the camera position derived from the
+            // head marker / head probe seems to be off compared to the player's actual
+            // view. Need to debug with Camera.GetPosition() and compare to the marker
+            // or probe's position.
+
+            // BUG: When forcing OBJ_ATTACH mode with Camera.DynamicAttach, player input
+            // is not stopped. So the player can move, can use items and so on. This is
+            // pretty bad. So despite the visual advantages, might not want to use it.
+
+            // BUG: When forcing OBJ_ATTACH mode with Camera.DynamicAttach, the player's
+            // camera is reset to straight and level after returning (although z rotation
+            // remains unchanged). This is disorienting.
+        } else {
+            attach_camera_to = probe;
+
+            // BUG: When using Camera.DynamicAttach to a probe, the rotation of the probe's
+            // facing seems to end up doubled. Perhaps bug relating to the FOV change?
+            // (Note that this affects CamGrenades too, but since they're thrown, their
+            // initial orientation is somewhat random anyway, so who would notice?)
+            //
+            // WORKAROUND: Halve each component of the camera's facing so the transview
+            // cameras is looking the same way as the player was when activating it.
+            facing.x /= 2.0;
+            facing.y /= 2.0;
+            facing.z /= 2.0;
+        }
+
+        Object.Teleport(attach_camera_to, pos, facing, 0);
+        Camera.DynamicAttach(attach_camera_to);
     }
 
     function OnTimer()
@@ -331,6 +364,17 @@ class TransGarrett extends SqRootScript
         LinkTools.LinkSetData(link, "rel pos", vector(0.0, 0.0, 0.0));
         LinkTools.LinkSetData(link, "rel rot", vector(0.0, 0.0, 0.0));
     
+        return obj;
+    }
+
+    function GetCamMarker(name)
+    {
+        local obj = Object.Named(name);
+        if (obj != 0) { return obj; }
+
+        obj = Object.Create(Object.Named("Marker"));
+        Object.SetName(obj, name);
+
         return obj;
     }
 }
