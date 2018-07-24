@@ -44,13 +44,61 @@ local Transloc = {
 
 class Translocator extends SqRootScript
 {
-    function OnFrobInvEnd() {
-        local player = Object.Named("Player");
-        SendMessage(player, "Translocate");
+    frob_start_time = 0;
+    frob_max_duration = 1.0;
+    frobwhile_period = 0.1;
+    frobwhile_timer = 0;
+
+    function OnFrobInvBegin() {
+        frob_start_time = GetTime();
+
+        // Start a timer for mid-frob updates and maximum frob time
+        if (frobwhile_timer != 0) {
+            KillTimer(frobwhile_timer);
+            frobwhile_timer = 0;
+        }
+        frobwhile_timer = SetOneShotTimer(self, "FrobWhile", frobwhile_period);
     }
 
+    function OnTimer() {
+        if (message().name == "FrobWhile") {
+            frobwhile_timer = 0;
+            // Check if we've frobbed long enough
+            local frob_duration = (GetTime() - frob_start_time);
+            if (frob_duration >= frob_max_duration) {
+                // Force frobbing to stop
+                Debug.Command("use_item", 1);
+            } else {
+                // Keep the timer ticking
+                frobwhile_timer = SetOneShotTimer(self, "FrobWhile", frobwhile_period);
+            }
+        }
+    }
+
+    function OnFrobInvEnd() {
+        local frob_duration = message().Sec;
+        DarkUI.TextMessage("Frob duration: " + frob_duration);
+        if (frob_duration < frob_max_duration) {
+            // FIXME: should preview translocation
+        } else {
+            // Translocate if we frobbed for a while.
+            local player = Object.Named("Player");
+            SendMessage(player, "Translocate");
+
+            // FIXME: this doesn't work here! Dunno why, but maybe
+            // a PostMessage will work?
+            // But anyway, don't think I need to clear the item if
+            // I'm using translocate-on-long-frob anyway.
+            /*
+            // Deselect the translocator.
+            Debug.Command("clear_item");
+            */
+        }
+    }
+
+    // FIXME: this translocate-on-drop behaviour is quite unintuitive, and probably
+    // should be removed in favour of translocate-on-long-frob.
     function OnContained() {
-        //
         local player = Object.Named("Player");
         if ((message().container == player)
             && (message().event == eContainsEvent.kContainRemove)) {
