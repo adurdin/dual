@@ -44,10 +44,27 @@ local Transloc = {
 
 class Translocator extends SqRootScript
 {
-
     function OnFrobInvEnd() {
         local player = Object.Named("Player");
         SendMessage(player, "Translocate");
+    }
+
+    function OnContained() {
+        //
+        local player = Object.Named("Player");
+        if ((message().container == player)
+            && (message().event == eContainsEvent.kContainRemove)) {
+            // Prevent the player actually dropping the translocator, but perform
+            // a translocation instead.
+
+            // BUG: this plays loot sounds. It shouldn't!
+            Container.Add(self, player);
+
+            // Deselect the translocator.
+            Debug.Command("clear_item");
+
+            SendMessage(player, "Translocate");
+        }
     }
 }
 
