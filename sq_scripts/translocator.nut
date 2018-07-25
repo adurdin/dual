@@ -1,47 +1,3 @@
-local Transloc = {
-    // FIXME: consider using ref_frame arg and reference objects for the worlds.
-    // Would allow better determination of where we are without hardcoding numbers.
-    // World reference objects could be linked to the TranslocationMagic object.
-
-    // Worlds must be spread out on the Y axis, and aligned on the X and Z axis.
-    _worlds = [
-        {
-            origin = vector(0, 0, 0),
-            min_y = -256,
-            max_y = 256,
-        },
-        {
-            origin = vector(0, 512, 0),
-            min_y = 256,
-            max_y = 768,
-        },
-    ]
-
-    WorldIndex = function(pos) {
-        foreach (index, world in _worlds) {
-            if (pos.y >= world.min_y && pos.y < world.max_y) {
-                return index;
-            }
-        }
-        throw ("No world found at position: " + pos);
-    }
-
-    AlternateWorldIndex = function(world_index) {
-        if (world_index == 0) {
-            return 1;
-        } else {
-            return 0;
-        }
-    }
-
-    AlternateWorldPosition = function(pos) {
-        local world_index_a = WorldIndex(pos);
-        local world_index_b = AlternateWorldIndex(world_index_a);
-        local relative = (pos - _worlds[world_index_a].origin);
-        return _worlds[world_index_b].origin + relative;
-    }
-}
-
 class Translocator extends SqRootScript
 {
     frob_start_time = 0;
@@ -79,40 +35,12 @@ class Translocator extends SqRootScript
         local frob_duration = message().Sec;
         if (frob_duration < frob_max_duration) {
             // Preview where we would translocate to if frobbed for a moment.
-            local player = Object.Named("Player");
-            SendMessage(player, "Transview");
+            local controller = Object.Named("DualController");
+            SendMessage(controller, "Transview");
         } else {
             // Translocate if we frobbed for a while.
-            local player = Object.Named("Player");
-            SendMessage(player, "Translocate");
-
-            // FIXME: this doesn't work here! Dunno why, but maybe
-            // a PostMessage will work?
-            // But anyway, don't think I need to clear the item if
-            // I'm using translocate-on-long-frob anyway.
-            /*
-            // Deselect the translocator.
-            Debug.Command("clear_item");
-            */
-        }
-    }
-
-    // FIXME: this translocate-on-drop behaviour is quite unintuitive, and probably
-    // should be removed in favour of translocate-on-long-frob.
-    function OnContained() {
-        local player = Object.Named("Player");
-        if ((message().container == player)
-            && (message().event == eContainsEvent.kContainRemove)) {
-            // Prevent the player actually dropping the translocator, but perform
-            // a translocation instead.
-
-            // BUG: this plays loot sounds. It shouldn't!
-            Container.Add(self, player);
-
-            // Deselect the translocator.
-            Debug.Command("clear_item");
-
-            SendMessage(player, "Translocate");
+            local controller = Object.Named("DualController");
+            SendMessage(controller, "Translocate");
         }
     }
 }
@@ -133,8 +61,9 @@ const PLAYER_HEIGHT = 6.0;
 
 const FORCE_OBJ_ATTACH_MODE = false;
 
-class TransGarrett extends SqRootScript
+class DualController extends SqRootScript
 {
+    has_setup = false;
     head_marker = 0;
     foot_marker = 0;
     body_marker = 0;
@@ -142,19 +71,32 @@ class TransGarrett extends SqRootScript
     body_probe = 0;
     foot_probe = 0;
     head_cam = 0;
+    all_worlds = null;
+    current_world_index = 0;
     autoprobe_name = "AutoProbe";
     autoprobe_period = 0.1;
     autoprobe_timer = 0;
 
-    function OnBeginScript()
+    function OnDarkGameModeChange()
     {
-        if (self == Object.Named("Player")) {
+        if (! has_setup) {
             SetupTranslocation();
+            has_setup = true;
         }
     }
 
     function SetupTranslocation()
     {
+        local player = Object.Named("Player");
+
+        all_worlds = FindAllWorlds();
+        current_world_index = FindClosestWorldIndex(Object.Position(player));
+        if (all_worlds.len() == 0 || current_world_index == null) {
+            throw "Couldn't find any worlds!";
+        } else {
+            print("Found " + all_worlds.len() + " worlds, current is " + current_world_index);
+        }
+
         // BUG: For whatever reason the Player doesn't get Sim messages! And BeginScript is too early
         // for creating the probe.
         //
@@ -164,7 +106,6 @@ class TransGarrett extends SqRootScript
         // FIX: put the script on another "manager" type object, whose OnSim should have access to the player.
 
         // Attach marker objects to submodels of the Player whose position we want to know.
-        local player = self;
         head_marker = GetSubmodelMarker("PlayerHeadMarker", player, PLAYER_HEAD);
         body_marker = GetSubmodelMarker("PlayerBodyMarker", player, PLAYER_BODY);
         foot_marker = GetSubmodelMarker("PlayerFootMarker", player, PLAYER_FOOT);
@@ -192,11 +133,84 @@ class TransGarrett extends SqRootScript
         */
     }
 
+    function FindAllWorlds() {
+        // Find all the ScriptParams:DualOrigin-linked markers
+        local world_objs = [];
+        local links = Link.GetAll("ScriptParams", self);
+        foreach (link in links) {
+            local data = LinkTools.LinkGetData(link, "");
+            if (data == "DualOrigin") {
+                local o = LinkDest(link);
+                world_objs.append(o);
+            }
+        }
+
+        // Construct the world cache
+        local worlds = [];
+        foreach (o in world_objs) {
+            local world = {
+                obj = o,
+                origin = Object.Position(o),
+                scale = SendMessage(o, "DualScale"),
+                next_obj = SendMessage(o, "DualNext"),
+                next_index = null,
+            };
+            worlds.append(world);
+        }
+
+        // Link each world to the next by index
+        foreach (index, world in worlds) {
+            local next_index = world_objs.find(world.next_obj);
+            if (next_index == null) {
+                next_index = index;
+            }
+            world.next_index = next_index;
+        }
+
+        // Print out what we found
+        foreach (index, world in worlds) {
+            print("Found world " + index + ": "
+                + Object.GetName(world.obj) + " (" + world.obj + ")"
+                + " at: " + world.origin + ", scale: " + world.scale
+                + ", next_obj: " + world.next_obj + ", next_index: " + world.next_index);
+        }
+
+        return worlds;
+    }
+
+    function FindClosestWorldIndex(pos) {
+        local closest_index = null;
+        local closest_distance = 1000000000.0;
+        foreach(index, world in all_worlds) {
+            // Because worlds can have different scales, we need to divide by
+            // the scale to get relative positions that are comparable.
+            local relative_pos = (pos - world.origin) / world.scale;
+            local distance = relative_pos.Length();
+            if (distance < closest_distance) {
+                closest_distance = distance;
+                closest_index = index;
+            }
+        }
+        return closest_index;
+    }
+
+    function NextWorldIndex(index) {
+        return all_worlds[index].next_index;
+    }
+
+    function WorldPos(pos, from_index, to_index) {
+        local from_world = all_worlds[from_index];
+        local to_world = all_worlds[to_index];
+        local relative_pos = (pos - from_world.origin) / from_world.scale;
+        return to_world.origin + (relative_pos * to_world.scale);
+    }
+
     function OnTransview() {
-        local player = self;
+        local player = Object.Named("Player");
         local pos = Object.Position(player);
         local facing = Object.Facing(player);
-        local new_pos = Transloc.AlternateWorldPosition(pos);
+        local next_world_index = NextWorldIndex(current_world_index);
+        local new_pos = WorldPos(pos, current_world_index, next_world_index);
         local valid = Probe(new_pos);
 
         // ISSUE: same collision issues as Translocate()
@@ -211,11 +225,16 @@ class TransGarrett extends SqRootScript
     }
 
     function OnTranslocate() {
-        local player = self;
+        local player = Object.Named("Player");
         local pos = Object.Position(player);
         local facing = Object.Facing(player);
-        local new_pos = Transloc.AlternateWorldPosition(pos);
+        local next_world_index = NextWorldIndex(current_world_index);
+        local new_pos = WorldPos(pos, current_world_index, next_world_index);
         local valid = Probe(new_pos);
+        print((valid ? "Valid" : "Invalid") + " attempt to translocate from " + pos + " in world " + current_world_index + " to " + new_pos + " in world " + next_world_index);
+
+        // BUG: this translocation is failing for some reason?? It thinks the second time around, that it's
+        // not valid? Huh?
 
         // ISSUE: player can translocate as fast as they can mash the button.
         // FIX: add some kind of delay in here.
@@ -229,6 +248,8 @@ class TransGarrett extends SqRootScript
         // Then query against that before teleporting to see if it should be allowed.
 
         if (valid) {
+            current_world_index = next_world_index;
+
             Object.Teleport(player, new_pos, facing);
             Sound.PlayVoiceOver(player, "blue_light_on");
 
@@ -258,7 +279,7 @@ class TransGarrett extends SqRootScript
     }
 
     function Probe(pos) {
-        local player = self;
+        local player = Object.Named("Player");
         local player_pos = Object.Position(player);
         local valid = true;
         if (valid) { valid = valid && EvaluateSingleProbe(head_probe, pos, head_marker, player_pos); }
@@ -389,5 +410,34 @@ class TransGarrett extends SqRootScript
         Object.SetName(obj, name);
 
         return obj;
+    }
+}
+
+class DualOrigin extends SqRootScript
+{
+    function OnDualScale() {
+        // FIXME: read userparams() for ScaleX, ScaleY, ScaleZ
+        Reply(vector(1.0));
+    }
+
+    function OnDualNext() {
+        // Find the first ScriptParams:DualNext link (if any)
+        local links = Link.GetAll("ScriptParams", self);
+        foreach (link in links) {
+            local data = LinkTools.LinkGetData(link, "");
+            if (data == "DualNext") {
+                ReplyWithObj(LinkDest(link));
+                return;
+            }
+        }
+        ReplyWithObj(0);
+    }
+
+    function OnDualEnter() {
+        // FIXME: get DualPlayer to send this when entering this world
+    }
+
+    function OnDualExit() {
+        // FIXME: get DualPlayer to send this when exiting this world
     }
 }
