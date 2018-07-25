@@ -146,7 +146,15 @@ class TransGarrett extends SqRootScript
     autoprobe_period = 0.1;
     autoprobe_timer = 0;
 
-    function OnDarkGameModeChange() {
+    function OnBeginScript()
+    {
+        if (self == Object.Named("Player")) {
+            SetupTranslocation();
+        }
+    }
+
+    function SetupTranslocation()
+    {
         // BUG: For whatever reason the Player doesn't get Sim messages! And BeginScript is too early
         // for creating the probe.
         //
@@ -297,6 +305,8 @@ class TransGarrett extends SqRootScript
 
             // NOTE: Can customise camera/camovl.txt somewhat to adjust the appearance of the
             // lens overlay to be more suitable. But the remote camera FOV is hard-coded.
+            // Or can just use the NewDark Renderer/Camera Overlay property, for a different
+            // set of possible effects.
 
             // BUG: When using Camera.DynamicAttach to a probe, the rotation of the probe's
             // facing seems to end up doubled. Perhaps bug relating to the FOV change?
