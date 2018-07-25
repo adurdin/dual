@@ -61,6 +61,16 @@ const PLAYER_HEIGHT = 6.0;
 
 const FORCE_OBJ_ATTACH_MODE = false;
 
+// The mission must have one and only one Marker, named "DualController", with this DualController
+// script on it. It must have ScriptParams("DualOrigin") links to one or more Marker objects that
+// represent the origins of the different worlds to translocate between.
+//
+// Each origin marker must have the DualOrigin script on it, and a ScriptParams("DualNext") link to
+// the origin marker that corresponds to its alternate world.
+//
+// NOTE: Used to use a script attached to the StartingPoint (and thus the player) for translocation
+// purposes, but changed it because links to the different DualOrigins weren't copied to the Player.
+// And having the script on both the StartingPoint and the Player ended up problematic.
 class DualController extends SqRootScript
 {
     has_setup = false;
@@ -79,6 +89,8 @@ class DualController extends SqRootScript
 
     function OnDarkGameModeChange()
     {
+        // OnSim is too soon (and gets called in-editor too!)
+        // But OnDarkGameModeChange happens often. So make sure we only set up once.
         if (! has_setup) {
             SetupTranslocation();
             has_setup = true;
@@ -89,6 +101,7 @@ class DualController extends SqRootScript
     {
         local player = Object.Named("Player");
 
+        // Find all the worlds, and figure out which the player starts in.
         all_worlds = FindAllWorlds();
         current_world_index = FindClosestWorldIndex(Object.Position(player));
         if (all_worlds.len() == 0 || current_world_index == null) {
@@ -96,14 +109,6 @@ class DualController extends SqRootScript
         } else {
             print("Found " + all_worlds.len() + " worlds, current is " + current_world_index);
         }
-
-        // BUG: For whatever reason the Player doesn't get Sim messages! And BeginScript is too early
-        // for creating the probe.
-        //
-        // WORKAROUND: Use DarkGameModeChange and keep track of if we've already created the probe.
-        // Note that this will also fire when ending the level and just before a reload, but those
-        // cases will just find the existing probe, so probably nothing to worry about.
-        // FIX: put the script on another "manager" type object, whose OnSim should have access to the player.
 
         // Attach marker objects to submodels of the Player whose position we want to know.
         head_marker = GetSubmodelMarker("PlayerHeadMarker", player, PLAYER_HEAD);
@@ -115,6 +120,7 @@ class DualController extends SqRootScript
         body_probe = GetSphereProbe("PlayerBodyProbe", PLAYER_RADIUS);
         foot_probe = GetSphereProbe("PlayerFootProbe", 0.0);
 
+        // FIXME: remove FORCE_OBJ_ATTACH_MODE, since it's got too many downsides.
         if (FORCE_OBJ_ATTACH_MODE) {
             // Create marker object for remote cam.
             head_cam = GetCamMarker("PlayerHeadCam");
@@ -233,11 +239,8 @@ class DualController extends SqRootScript
         local valid = Probe(new_pos);
         print((valid ? "Valid" : "Invalid") + " attempt to translocate from " + pos + " in world " + current_world_index + " to " + new_pos + " in world " + next_world_index);
 
-        // BUG: this translocation is failing for some reason?? It thinks the second time around, that it's
-        // not valid? Huh?
-
-        // ISSUE: player can translocate as fast as they can mash the button.
-        // FIX: add some kind of delay in here.
+        // ISSUE: (if not using long frob) the player can translocate as fast as they
+        // can mash the button.
 
         // ISSUE: player can end up inside an object after translocating, and we
         // cannot detect this with ValidPos() which only cares about terrain; nor
@@ -249,7 +252,6 @@ class DualController extends SqRootScript
 
         if (valid) {
             current_world_index = next_world_index;
-
             Object.Teleport(player, new_pos, facing);
             Sound.PlayVoiceOver(player, "blue_light_on");
 
@@ -271,6 +273,10 @@ class DualController extends SqRootScript
             // try to store which world the player is in with a variable, instead of by
             // comparing player position to the reference points. Also an issue
             // for player equipment, if I'm taking that away when translocating.
+            //
+            // POSSIBLE WORKAROUND: Re-evaluate current world index every time we translocate
+            // based on the closest origin. Then ending up in the wrong world by accident will
+            // self-correct next time the player translocates.
 
         } else /* ! valid */ {
             // Translocating now would put us inside a wall or something. That's not great.
@@ -416,7 +422,8 @@ class DualController extends SqRootScript
 class DualOrigin extends SqRootScript
 {
     function OnDualScale() {
-        // FIXME: read userparams() for ScaleX, ScaleY, ScaleZ
+        // FIXME: read userparams() for ScaleX, ScaleY, ScaleZ. Can't use the
+        // Scale property, can we?
         Reply(vector(1.0));
     }
 
