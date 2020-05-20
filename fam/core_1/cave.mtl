@@ -1,0 +1,9 @@
+render_pass
+{
+    // Use the mission-defined envmap as a skybox:
+    use_location_envtex 2
+    uv_source PROJECTION
+    uv_mod SCALE 1 1
+    no_mipmap 1
+    render_material_only 1
+}
