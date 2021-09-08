@@ -1,87 +1,6 @@
-DOOR_ACTION_STRING <- {
-    [eDoorAction.kOpen] = "kOpen",
-    [eDoorAction.kClose] = "kClose",
-    [eDoorAction.kOpening] = "kOpening",
-    [eDoorAction.kClosing] = "kClosing",
-    [eDoorAction.kHalt] = "kHalt",
-};
-
-DOOR_STATUS_STRING <- {
-    [eDoorStatus.kDoorClosed] = "kDoorClosed",
-    [eDoorStatus.kDoorOpen] = "kDoorOpen",
-    [eDoorStatus.kDoorClosing] = "kDoorClosing",
-    [eDoorStatus.kDoorOpening] = "kDoorOpening",
-    [eDoorStatus.kDoorHalt] = "kDoorHalt",
-    [eDoorStatus.kDoorNoDoor] = "kDoorNoDoor",
-};
-
-class DualPuzzleDoor extends SqRootScript
-{
-    function PrintDoorMessage() {
-        local state = Door.GetDoorState(self);
-        local actionType = message().ActionType;
-        local prevActionType = message().PrevActionType;
-        local isProxy = message().isProxy;
-        print(Object.GetName(self) + ": "
-            + message().message
-            + ", " + DOOR_ACTION_STRING[actionType]
-            + ", prev " + DOOR_ACTION_STRING[prevActionType]
-            + ", proxy " + isProxy
-            + "; state " + DOOR_STATUS_STRING[state]);
-    }
-
-    function PrintOtherMessage() {
-        local state = Door.GetDoorState(self);
-        print(Object.GetName(self) + ": "
-            + message().message
-            + "; state " + DOOR_STATUS_STRING[state]);
-    }
-
-    function OnTurnOn() {
-        PrintOtherMessage();
-        Door.OpenDoor(self);
-    }
-
-    function OnTurnOff() {
-        PrintOtherMessage();
-        Door.CloseDoor(self);
-    }
-
-    function OnDoorOpen() { PrintDoorMessage();
-        SendMessage(ObjID("AscensionPuzzle"), message().message); }
-    function OnDoorOpening() { PrintDoorMessage();
-        SendMessage(ObjID("AscensionPuzzle"), message().message); }
-    function OnDoorClose() { PrintDoorMessage();
-        SendMessage(ObjID("AscensionPuzzle"), message().message); }
-    function OnDoorClosing() { PrintDoorMessage();
-        SendMessage(ObjID("AscensionPuzzle"), message().message); }
-    function OnDoorHalt() { PrintDoorMessage();
-        SendMessage(ObjID("AscensionPuzzle"), message().message); }
-}
-
-class DualPlat extends SqRootScript
-{
-    function OnCall() {
-        SendMessage(ObjID("AscensionPuzzle"), "PlatStarted");
-    }
-
-    function OnMovingTerrainWaypoint() {
-        SendMessage(ObjID("AscensionPuzzle"), "PlatReachedWaypoint", message().waypoint);
-    }
-}
-
-class DualRotBridge extends DualPuzzleDoor
-{
-}
-
-/*************************************/
-
-const COLLTYPE_BOUNCE = 0x1;
-const COLLTYPE_NONE = 0x0;
-
 /** AscensionPuzzle controls all the state of the puzzle. Levers and
  *  knobs send their inputs here; the internal state of the puzzle is
- *  updated accordingly; then the appropriate messages are sent to
+ *  updated accordingly; then the appropriate properties are set on
  *  the moving platforms. This ensures the puzzle state remains
  *  consistent and the moving platforms are brought in line with the
  *  state; and also that inputs are managed while the platforms are
@@ -89,54 +8,100 @@ const COLLTYPE_NONE = 0x0;
  */
 class AscensionPuzzle extends SqRootScript
 {
+    P1Base = 0;
+    P1Bridge1 = 0;
+    P1Bridge2 = 0;
+
+    function OnBeginScript() {
+        if (! IsDataSet("Animating")) SetData("Animating", 0);
+        if (! IsDataSet("P1Rise")) SetData("P1Rise", 0);
+        if (! IsDataSet("P1Rot")) SetData("P1Rot", 0);
+        if (! IsDataSet("P1Bridge1")) SetData("P1Bridge1", 0);
+    }
+
     function OnSim() {
         if (message().starting) {
-            local P1Rise = ObjID("P1Rise");
-            local P1Bridge1 = ObjID("P1Bridge1");
-            local P1Bridge2 = ObjID("P1Bridge2");
-            local P1Bridge1Rising = ObjID("P1Bridge1Rising");
-            local P1Bridge2Rising = ObjID("P1Bridge2Rising");
-            // Property.SetSimple(P1Bridge1, "CollisionType", COLLTYPE_BOUNCE);
-            // Property.SetSimple(P1Bridge2, "CollisionType", COLLTYPE_BOUNCE);
-            // Property.SetSimple(P1Bridge1Rising, "CollisionType", COLLTYPE_NONE);
-            // Property.SetSimple(P1Bridge2Rising, "CollisionType", COLLTYPE_NONE);
+            P1Base = ObjID("P1Base");
+            P1Bridge1 = ObjID("P1Bridge1");
+            P1Bridge2 = ObjID("P1Bridge2");
+            local pos = Property.Get(P1Base, "PhysState", "Location");
+            local fac = Property.Get(P1Base, "PhysState", "Facing");
+            SetData("P1BasePos", pos);
+            SetData("P1BaseFac", fac);
+            UpdatePositions();
         }
+    }
+
+    function UpdatePositions() {
+        // TODO: animating!
+        local basePos = GetData("P1BasePos");
+        local baseFac = GetData("P1BaseFac");
+        local vRise = GetData("P1Rise").tofloat();
+        local vRot = GetData("P1Rot").tofloat();
+        local vBridge1 = GetData("P1Bridge1").tofloat();
+
+        local targetPos = basePos;
+        targetPos += vector(0,0,48)*vRise;
+        local targetFac = baseFac;
+        targetFac += vector(0,0,90)*vRot;
+
+        const halfpi = 1.5707963267948966;
+        local n1 = vector(cos(vRot*halfpi),sin(vRot*halfpi),0);
+        local n2 = vector(n1.y,-n1.x,0);
+
+        local bridge1TargetPos = targetPos;
+        if (GetData("P1Bridge1"))
+            bridge1TargetPos += n1*17.0;
+        local bridge1TargetFac = targetFac+vector(0,0,90);
+        local bridge2TargetPos = targetPos+n2*17.0;
+        local bridge2TargetFac = targetFac;
+
+        print("POSITIONS and FACINGS:");
+        print("  base: "+targetPos+" - "+targetFac);
+        print("  bridge1: "+bridge1TargetPos+" - "+bridge1TargetFac);
+        print("  bridge2: "+bridge2TargetPos+" - "+bridge2TargetFac);
+
+        Object.Teleport(P1Base, targetPos, targetFac);
+        Object.Teleport(P1Bridge1, bridge1TargetPos, bridge1TargetFac);
+        Object.Teleport(P1Bridge2, bridge2TargetPos, bridge2TargetFac);
+
+        //// this moves the physics box, but not the visible object!
+        // Property.Set(P1Base, "PhysState", "Location", targetPos);
+        // Property.Set(P1Base, "PhysState", "Facing", targetFac);
+        // Property.Set(P1Bridge1, "PhysState", "Location", bridge1TargetPos);
+        // Property.Set(P1Bridge1, "PhysState", "Facing", bridge1TargetFac);
+        // Property.Set(P1Bridge2, "PhysState", "Location", bridge2TargetPos);
+        // Property.Set(P1Bridge2, "PhysState", "Facing", bridge2TargetFac);
     }
 
     function OnTurnOn() {
-        local P1Rise = ObjID("P1Rise");
-        local P1Bridge1 = ObjID("P1Bridge1");
-        local P1Bridge2 = ObjID("P1Bridge2");
-        local P1Bridge1Rising = ObjID("P1Bridge1Rising");
-        local P1Bridge2Rising = ObjID("P1Bridge2Rising");
-        local P1Bridge1Vis = ObjID("P1Bridge1Vis");
-        local P1Bridge2Vis = ObjID("P1Bridge2Vis");
-        if (message().from==ObjID("P1RotSwitch")) {
-            SendMessage(P1Bridge1, "TurnOn");
-            SendMessage(P1Bridge2, "TurnOn");
+        if (message().from==ObjID("P1Bridge1Switch")) {
+            SetData("P1Bridge1", 1);
+        } else if (message().from==ObjID("P1RotSwitch")) {
+            local rot = GetData("P1Rot");
+            rot = (rot+3)%4;
+            SetData("P1Rot", rot);
         } else if (message().from==ObjID("P1RiseSwitch")) {
-            //SendMessage(P1Rise, "TurnOn");
-            //SendMessage(P1Bridge1Rising, "TurnOn");
-            SendMessage("P1TopPt", "TurnOn");
+            SetData("P1Rise", 1);
         }
+        UpdatePositions();
     }
 
     function OnTurnOff() {
-        local P1Rise = ObjID("P1Rise");
-        local P1Bridge1 = ObjID("P1Bridge1");
-        local P1Bridge2 = ObjID("P1Bridge2");
-        local P1Bridge1Rising = ObjID("P1Bridge1Rising");
-        local P1Bridge2Rising = ObjID("P1Bridge2Rising");
-        if (message().from==ObjID("P1RotSwitch")) {
-            SendMessage(P1Bridge1, "TurnOff");
-            SendMessage(P1Bridge2, "TurnOff");
+        if (message().from==ObjID("P1Bridge1Switch")) {
+            SetData("P1Rise", 0);
+            SetData("P1Rot", 0);
+            SetData("P1Bridge1", 0);
+        } else if (message().from==ObjID("P1RotSwitch")) {
+            local rot = GetData("P1Rot");
+            rot = (rot+1)%4;
+            SetData("P1Rot", rot);
         } else if (message().from==ObjID("P1RiseSwitch")) {
-            //SendMessage(P1Rise, "TurnOff");
-            //SendMessage(P1Bridge1Rising, "TurnOff");
-            SendMessage("P1BottomPt", "TurnOn");
+            SetData("P1Rise", 0);
         }
+        UpdatePositions();
     }
-
+/*
     function OnPlatStarted() {
         print(message().message + " from " + Object.GetName(message().from));
         SetRisingMode(true);
@@ -196,7 +161,7 @@ class AscensionPuzzle extends SqRootScript
         // Link.DestroyMany("DetailAttachement", P1Bridge1Vis, "*");
         // local link = Link.Create("DetailAttachement", P1Bridge1Vis, risingMode?P1Bridge1Rising:P1Bridge1);
     }
-
+*/
 /*
     function Reset() {
         SetData("P1Rot", 0);
