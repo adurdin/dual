@@ -47,11 +47,16 @@ class DualPuzzleDoor extends SqRootScript
         Door.CloseDoor(self);
     }
 
-    function OnDoorOpen() { PrintDoorMessage(); }
-    function OnDoorOpening() { PrintDoorMessage(); }
-    function OnDoorClose() { PrintDoorMessage(); }
-    function OnDoorClosing() { PrintDoorMessage(); }
-    function OnDoorHalt() { PrintDoorMessage(); }
+    function OnDoorOpen() { PrintDoorMessage();
+        SendMessage(ObjID("AscensionPuzzle"), message().message); }
+    function OnDoorOpening() { PrintDoorMessage();
+        SendMessage(ObjID("AscensionPuzzle"), message().message); }
+    function OnDoorClose() { PrintDoorMessage();
+        SendMessage(ObjID("AscensionPuzzle"), message().message); }
+    function OnDoorClosing() { PrintDoorMessage();
+        SendMessage(ObjID("AscensionPuzzle"), message().message); }
+    function OnDoorHalt() { PrintDoorMessage();
+        SendMessage(ObjID("AscensionPuzzle"), message().message); }
 }
 
 class DualPlat extends DualPuzzleDoor
@@ -64,6 +69,9 @@ class DualRotBridge extends DualPuzzleDoor
 
 /*************************************/
 
+const COLLTYPE_BOUNCE = 0x1;
+const COLLTYPE_NONE = 0x0;
+
 /** AscensionPuzzle controls all the state of the puzzle. Levers and
  *  knobs send their inputs here; the internal state of the puzzle is
  *  updated accordingly; then the appropriate messages are sent to
@@ -74,6 +82,100 @@ class DualRotBridge extends DualPuzzleDoor
  */
 class AscensionPuzzle extends SqRootScript
 {
+    function OnSim() {
+        if (message().starting) {
+            local P1Rise = ObjID("P1Rise");
+            local P1Bridge1 = ObjID("P1Bridge1");
+            local P1Bridge2 = ObjID("P1Bridge2");
+            local P1Bridge1Rising = ObjID("P1Bridge1Rising");
+            local P1Bridge2Rising = ObjID("P1Bridge2Rising");
+            // Property.SetSimple(P1Bridge1, "CollisionType", COLLTYPE_BOUNCE);
+            // Property.SetSimple(P1Bridge2, "CollisionType", COLLTYPE_BOUNCE);
+            // Property.SetSimple(P1Bridge1Rising, "CollisionType", COLLTYPE_NONE);
+            // Property.SetSimple(P1Bridge2Rising, "CollisionType", COLLTYPE_NONE);
+        }
+    }
+
+    function OnTurnOn() {
+        local P1Rise = ObjID("P1Rise");
+        local P1Bridge1 = ObjID("P1Bridge1");
+        local P1Bridge2 = ObjID("P1Bridge2");
+        local P1Bridge1Rising = ObjID("P1Bridge1Rising");
+        local P1Bridge2Rising = ObjID("P1Bridge2Rising");
+        local P1Bridge1Vis = ObjID("P1Bridge1Vis");
+        local P1Bridge2Vis = ObjID("P1Bridge2Vis");
+        if (message().from==ObjID("P1RotSwitch")) {
+            SendMessage(P1Bridge1, "TurnOn");
+            SendMessage(P1Bridge2, "TurnOn");
+        } else if (message().from==ObjID("P1RiseSwitch")) {
+            SendMessage(P1Rise, "TurnOn");
+            SendMessage(P1Bridge1Rising, "TurnOn");
+        }
+    }
+
+    function OnTurnOff() {
+        local P1Rise = ObjID("P1Rise");
+        local P1Bridge1 = ObjID("P1Bridge1");
+        local P1Bridge2 = ObjID("P1Bridge2");
+        local P1Bridge1Rising = ObjID("P1Bridge1Rising");
+        local P1Bridge2Rising = ObjID("P1Bridge2Rising");
+        if (message().from==ObjID("P1RotSwitch")) {
+            SendMessage(P1Bridge1, "TurnOff");
+            SendMessage(P1Bridge2, "TurnOff");
+        } else if (message().from==ObjID("P1RiseSwitch")) {
+            SendMessage(P1Rise, "TurnOff");
+            SendMessage(P1Bridge1Rising, "TurnOff");
+        }
+    }
+
+    function OnDoorOpening() {
+        if (message().from==ObjID("P1Rise")) {
+            print(message().message + " from " + Object.GetName(message().from));
+            SetRisingMode(true);
+        }
+    }
+
+    function OnDoorOpen() {
+        if (message().from==ObjID("P1Rise")) {
+            print(message().message + " from " + Object.GetName(message().from));
+            SetRisingMode(false);
+        }
+    }
+
+    function OnDoorClosing() {
+        if (message().from==ObjID("P1Rise")) {
+            print(message().message + " from " + Object.GetName(message().from));
+            SetRisingMode(true);
+        }
+    }
+
+    function OnDoorClose() {
+        if (message().from==ObjID("P1Rise")) {
+            print(message().message + " from " + Object.GetName(message().from));
+            SetRisingMode(false);
+        }
+    }
+
+    function SetRisingMode(risingMode) {
+        local P1Rise = ObjID("P1Rise");
+        local P1Bridge1 = ObjID("P1Bridge1");
+        local P1Bridge2 = ObjID("P1Bridge2");
+        local P1Bridge1Rising = ObjID("P1Bridge1Rising");
+        local P1Bridge2Rising = ObjID("P1Bridge2Rising");
+        local P1Bridge1Vis = ObjID("P1Bridge1Vis");
+
+        Property.SetSimple(P1Bridge1, "CollisionType", risingMode?COLLTYPE_NONE:COLLTYPE_BOUNCE);
+        Property.SetSimple(P1Bridge2, "CollisionType", risingMode?COLLTYPE_NONE:COLLTYPE_BOUNCE);
+        Property.SetSimple(P1Bridge1Rising, "CollisionType", risingMode?COLLTYPE_BOUNCE:COLLTYPE_NONE);
+        Property.SetSimple(P1Bridge2Rising, "CollisionType", risingMode?COLLTYPE_BOUNCE:COLLTYPE_NONE);
+        local pos = Object.Position(risingMode?P1Bridge1:P1Bridge1Rising);
+        local fac = Object.Facing(risingMode?P1Bridge1:P1Bridge1Rising);
+        Object.Teleport(risingMode?P1Bridge1Rising:P1Bridge1, pos, fac);
+        Link.DestroyMany("DetailAttachement", P1Bridge1Vis, "*");
+        local link = Link.Create("DetailAttachement", P1Bridge1Vis, risingMode?P1Bridge1Rising:P1Bridge1);
+    }
+
+/*
     function Reset() {
         SetData("P1Rot", 0);
         SetData("P1Rise", 0);
@@ -101,9 +203,9 @@ class AscensionPuzzle extends SqRootScript
         v = (v+4)%4;
         SetData(var, v);
     }
-
+*/
     /* messages from levers and knobs */
-
+/*
     function OnP1ToggleBridge1() {
         ToggleVar("P1Bridge1");
         // Reset the puzzle when the bridge is retracted!
@@ -137,13 +239,13 @@ class AscensionPuzzle extends SqRootScript
         RotateVar("P2Rot", 1);
         Update();
     }
-
+*/
     /* messages from platforms */
 
     // TODO
 
     /* manage all the things! */
-
+/*
     function Update() {
         // add and remove links. move the elevators. rotate the doors.
         // extend the platforms. just a whole ton of things to do!
@@ -151,4 +253,5 @@ class AscensionPuzzle extends SqRootScript
 
         // TODO
     }
+*/
 }
