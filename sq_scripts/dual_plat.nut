@@ -59,8 +59,15 @@ class DualPuzzleDoor extends SqRootScript
         SendMessage(ObjID("AscensionPuzzle"), message().message); }
 }
 
-class DualPlat extends DualPuzzleDoor
+class DualPlat extends SqRootScript
 {
+    function OnCall() {
+        SendMessage(ObjID("AscensionPuzzle"), "PlatStarted");
+    }
+
+    function OnMovingTerrainWaypoint() {
+        SendMessage(ObjID("AscensionPuzzle"), "PlatReachedWaypoint", message().waypoint);
+    }
 }
 
 class DualRotBridge extends DualPuzzleDoor
@@ -108,8 +115,9 @@ class AscensionPuzzle extends SqRootScript
             SendMessage(P1Bridge1, "TurnOn");
             SendMessage(P1Bridge2, "TurnOn");
         } else if (message().from==ObjID("P1RiseSwitch")) {
-            SendMessage(P1Rise, "TurnOn");
-            SendMessage(P1Bridge1Rising, "TurnOn");
+            //SendMessage(P1Rise, "TurnOn");
+            //SendMessage(P1Bridge1Rising, "TurnOn");
+            SendMessage("P1TopPt", "TurnOn");
         }
     }
 
@@ -123,40 +131,48 @@ class AscensionPuzzle extends SqRootScript
             SendMessage(P1Bridge1, "TurnOff");
             SendMessage(P1Bridge2, "TurnOff");
         } else if (message().from==ObjID("P1RiseSwitch")) {
-            SendMessage(P1Rise, "TurnOff");
-            SendMessage(P1Bridge1Rising, "TurnOff");
+            //SendMessage(P1Rise, "TurnOff");
+            //SendMessage(P1Bridge1Rising, "TurnOff");
+            SendMessage("P1BottomPt", "TurnOn");
         }
     }
 
-    function OnDoorOpening() {
-        if (message().from==ObjID("P1Rise")) {
-            print(message().message + " from " + Object.GetName(message().from));
-            SetRisingMode(true);
-        }
+    function OnPlatStarted() {
+        print(message().message + " from " + Object.GetName(message().from));
+        SetRisingMode(true);
+        // okay, with this we _can_ rotate an object that is PhysAttached
+        // to the elevator! cant stand on it though (with or without the
+        // rotation, which is odd? but can live without).
+        SetData("PrevTime", GetTime());
+        PostMessage(self, "Foo");
     }
 
-    function OnDoorOpen() {
-        if (message().from==ObjID("P1Rise")) {
-            print(message().message + " from " + Object.GetName(message().from));
-            SetRisingMode(false);
-        }
+    function OnPlatReachedWaypoint() {
+        print(message().message + " from " + Object.GetName(message().from));
+        local pt = message().data;
+        //if (pt==ObjID("P1TopPt")) {
+        //} else if (pt==ObjID("P1BottomPt")) {
+        //}
+        SetRisingMode(false);
     }
 
-    function OnDoorClosing() {
-        if (message().from==ObjID("P1Rise")) {
-            print(message().message + " from " + Object.GetName(message().from));
-            SetRisingMode(true);
-        }
-    }
-
-    function OnDoorClose() {
-        if (message().from==ObjID("P1Rise")) {
-            print(message().message + " from " + Object.GetName(message().from));
-            SetRisingMode(false);
+    function OnFoo() {
+        local dt = GetTime()-GetData("PrevTime");
+        local o = ObjID("P1Bridge1Rising");
+        local fac = Property.Get(o, "PhysState", "Facing");
+        fac.z = fac.z + 30*dt;
+        //fac.z = 3.14/2;
+        Property.Set(o, "PhysState", "Facing", fac);
+        print("fac: " + fac);
+        if (GetData("RisingMode")) {
+            SetData("PrevTime", GetTime());
+            PostMessage(self, "Foo");
         }
     }
 
     function SetRisingMode(risingMode) {
+        print("SetRisingMode: "+risingMode);
+        SetData("RisingMode", risingMode);
         local P1Rise = ObjID("P1Rise");
         local P1Bridge1 = ObjID("P1Bridge1");
         local P1Bridge2 = ObjID("P1Bridge2");
@@ -164,15 +180,21 @@ class AscensionPuzzle extends SqRootScript
         local P1Bridge2Rising = ObjID("P1Bridge2Rising");
         local P1Bridge1Vis = ObjID("P1Bridge1Vis");
 
-        Property.SetSimple(P1Bridge1, "CollisionType", risingMode?COLLTYPE_NONE:COLLTYPE_BOUNCE);
-        Property.SetSimple(P1Bridge2, "CollisionType", risingMode?COLLTYPE_NONE:COLLTYPE_BOUNCE);
-        Property.SetSimple(P1Bridge1Rising, "CollisionType", risingMode?COLLTYPE_BOUNCE:COLLTYPE_NONE);
-        Property.SetSimple(P1Bridge2Rising, "CollisionType", risingMode?COLLTYPE_BOUNCE:COLLTYPE_NONE);
-        local pos = Object.Position(risingMode?P1Bridge1:P1Bridge1Rising);
-        local fac = Object.Facing(risingMode?P1Bridge1:P1Bridge1Rising);
-        Object.Teleport(risingMode?P1Bridge1Rising:P1Bridge1, pos, fac);
-        Link.DestroyMany("DetailAttachement", P1Bridge1Vis, "*");
-        local link = Link.Create("DetailAttachement", P1Bridge1Vis, risingMode?P1Bridge1Rising:P1Bridge1);
+        // Link.DestroyMany("PhysAttach", "*", P1Rise);
+        // if (risingMode) {
+        //     Link.Create("PhysAttach", P1Bridge1, P1Rise);
+        //     Link.Create("PhysAttach", P1Bridge2, P1Rise);
+        // }
+
+        // Property.SetSimple(P1Bridge1, "CollisionType", risingMode?COLLTYPE_NONE:COLLTYPE_BOUNCE);
+        // Property.SetSimple(P1Bridge2, "CollisionType", risingMode?COLLTYPE_NONE:COLLTYPE_BOUNCE);
+        // Property.SetSimple(P1Bridge1Rising, "CollisionType", risingMode?COLLTYPE_BOUNCE:COLLTYPE_NONE);
+        // Property.SetSimple(P1Bridge2Rising, "CollisionType", risingMode?COLLTYPE_BOUNCE:COLLTYPE_NONE);
+        // local pos = Object.Position(risingMode?P1Bridge1:P1Bridge1Rising);
+        // local fac = Object.Facing(risingMode?P1Bridge1:P1Bridge1Rising);
+        // Object.Teleport(risingMode?P1Bridge1Rising:P1Bridge1, pos, fac);
+        // Link.DestroyMany("DetailAttachement", P1Bridge1Vis, "*");
+        // local link = Link.Create("DetailAttachement", P1Bridge1Vis, risingMode?P1Bridge1Rising:P1Bridge1);
     }
 
 /*
