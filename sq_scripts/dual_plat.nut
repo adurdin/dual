@@ -19,10 +19,8 @@ class AscensionPuzzle extends SqRootScript
             P1Bridge1 = ObjID("P1Bridge1");
             P1Bridge2 = ObjID("P1Bridge2");
             // starting positions
-            local pos = Property.Get(P1Base, "PhysState", "Location");
-            local fac = Property.Get(P1Base, "PhysState", "Facing");
-            SetData("P1RootPos", pos);
-            SetData("P1RootFac", fac);
+            SetData("P1RootPos", Property.Get(P1Base, "PhysState", "Location"));
+            SetData("P1RootFac", Property.Get(P1Base, "PhysState", "Facing"));
             // initial configuration
             SetData("Animating", false);
             SetData("P1Rise", 0);
@@ -50,97 +48,102 @@ class AscensionPuzzle extends SqRootScript
         if (GetData("Animating")) PostMessage(self, "AnimFrame");
     }
 
-    function UpdatePositions(dt) {
-        local rootPos = GetData("P1RootPos");
-        local rootFac = GetData("P1RootFac");
-        local fRise = GetData("P1Rise").tofloat();
-        local fRot = GetData("P1Rot").tofloat();
-        local fRotDir = GetData("P1RotDir").tofloat();
-        local fBridge1 = GetData("P1Bridge1").tofloat();
+    function LinearNext(at, to, max_speed, dt) {
+        const MAX_POS_SPEED = 8.0;
+        local speed = (to-at)/dt;
+        if (abs(speed)>max_speed) {
+            speed = (speed<0?-max_speed:max_speed);
+            return at+speed*dt;
+        } else {
+            return to;
+        }
+    }
 
-        local basePosAt = Object.Position(P1Base);
-        local basePosTo = rootPos+vector(0,0,48)*fRise;
-        local baseFacAt = Object.Facing(P1Base);
-        local baseFacTo = rootFac+vector(0,0,90)*fRot;
+    function FacingNext(at, to, cw, max_speed, dt) {
+        if (cw) {
+            // CW - we require To < At
+            if (to>at) at += 360;
+        } else {
+            // CCW - we require To > At
+            if (to<at) to += 360;
+        }
+        local speed = (to-at)/dt;
+        local next = 0;
+        if (abs(speed)>max_speed) {
+            speed = (speed<0?-max_speed:max_speed);
+            next = at+speed*dt;
+        } else {
+            next = to*1.0; // ensure a copy!
+        }
+        // keep Next in range
+        next %= 360;
+        return next;
+    }
+
+    function UpdatePositions(dt) {
+        local p1rootPos = GetData("P1RootPos");
+        local p1rootFac = GetData("P1RootFac");
+        local p1fRise = GetData("P1Rise").tofloat();
+        local p1fRot = GetData("P1Rot").tofloat();
+        local p1fRotDir = GetData("P1RotDir").tofloat();
+        local p1fBridge1 = GetData("P1Bridge1").tofloat();
+
+        local p1basePosAt = Object.Position(P1Base);
+        local p1basePosTo = p1rootPos+vector(0,0,48)*p1fRise;
+        local p1baseFacAt = Object.Facing(P1Base);
+        local p1baseFacTo = p1rootFac+vector(0,0,90)*p1fRot;
 
         // Move the base
-        local basePosNext;
-        local baseFacNext;
+        local p1basePosNext;
+        local p1baseFacNext;
         if (GetData("Animating")) {
-            const MAX_POS_SPEED = 8.0;
-            const MAX_FAC_SPEED = 30.0;
-            local posSpeed = (basePosTo-basePosAt)/dt;
-            if (abs(posSpeed.z)>MAX_POS_SPEED) {
-                posSpeed.z = (posSpeed.z<0?-MAX_POS_SPEED:MAX_POS_SPEED);
-                basePosNext = basePosAt+posSpeed*dt;
-            } else {
-                basePosNext = basePosTo;
-            }
+            p1basePosNext = p1basePosTo*1.0; // ensure a copy!
+            p1basePosNext.z = LinearNext(
+                p1basePosAt.z, p1basePosTo.z, 8.0, dt);
 
-            if (fRotDir>0) {
-                // CCW - we require To > At
-                if (baseFacTo.z<baseFacAt.z)
-                    baseFacTo.z += 360;
-            } else {
-                // CW - we require To < At
-                if (baseFacTo.z>baseFacAt.z)
-                    baseFacAt.z += 360;
-            }
-            local facSpeed = (baseFacTo-baseFacAt)/dt;
-            if (abs(facSpeed.z)>MAX_FAC_SPEED) {
-                facSpeed.z = (facSpeed.z<0?-MAX_FAC_SPEED:MAX_FAC_SPEED);
-                baseFacNext = baseFacAt+facSpeed*dt;
-            } else {
-                baseFacNext = baseFacTo;
-            }
-            // keep Next in range
-            baseFacNext.z %= 360;
+            p1baseFacNext = p1baseFacTo*1.0; // ensure a copy!
+            p1baseFacNext.z = FacingNext(
+                p1baseFacAt.z, p1baseFacTo.z, p1fRotDir<0, 30.0, dt);
         } else {
-            basePosNext = basePosTo;
-            baseFacNext = baseFacTo;
+            p1basePosNext = p1basePosTo;
+            p1baseFacNext = p1baseFacTo;
         }
 
         // Move the bridges
         const pi = 3.141592653589793;
-        local a = baseFacNext.z*pi/180.0;
+        local a = p1baseFacNext.z*pi/180.0;
         local n1 = vector(cos(a),sin(a),0);
         local n2 = vector(n1.y,-n1.x,0);
         // Bridge 1 can extend and retract
-        local bridge1OutAt = (Object.Position(P1Bridge1)-basePosAt).Dot(n1);
-        local bridge1OutTo = fBridge1*17.0;
-        local bridge1OutNext;
+        local p1bridge1OutAt = (Object.Position(P1Bridge1)-p1basePosAt).Dot(n1);
+        local p1bridge1OutTo = p1fBridge1*17.0;
+        local p1bridge1OutNext;
         if (GetData("Animating")) {
-            const MAX_BRIDGE_SPEED = 4.0;
-            local outSpeed = (bridge1OutTo-bridge1OutAt)/dt;
-            if (abs(outSpeed)>MAX_BRIDGE_SPEED) {
-                outSpeed = (outSpeed<0?-MAX_BRIDGE_SPEED:MAX_BRIDGE_SPEED);
-                bridge1OutNext = bridge1OutAt+outSpeed*dt;
-            } else {
-                bridge1OutNext = bridge1OutTo;
-            }
+            p1bridge1OutNext = LinearNext(
+                p1bridge1OutAt, p1bridge1OutTo, 4.0, dt);
         } else {
-            bridge1OutNext = bridge1OutTo;
+            p1bridge1OutNext = p1bridge1OutTo;
         }
-        local bridge1PosNext = basePosNext+n1*bridge1OutNext;
-        local bridge1FacNext = baseFacNext+vector(0,0,90);
-        local bridge2PosNext = basePosNext+n2*17.0;
-        local bridge2FacNext = baseFacNext;
+        local p1bridge1PosNext = p1basePosNext+n1*p1bridge1OutNext;
+        local p1bridge1FacNext = p1baseFacNext+vector(0,0,90);
+        local p1bridge2PosNext = p1basePosNext+n2*17.0;
+        local p1bridge2FacNext = p1baseFacNext*1.0; // ensure a copy!
 
         //print("POSITIONS and FACINGS:");
-        print("basePos at "+basePosAt.z+", next "+basePosNext.z+", to "+basePosTo.z);
-        print("    Fac at "+baseFacAt.z+", next "+baseFacNext.z+", to "+baseFacTo.z);
-        print(" B1 out at "+bridge1OutAt+", next "+bridge1OutNext+", to "+bridge1OutTo);
+        print("basePos at "+p1basePosAt.z+", next "+p1basePosNext.z+", to "+p1basePosTo.z);
+        // print("    Fac at "+baseFacAt.z+", next "+baseFacNext.z+", to "+baseFacTo.z);
+        // print(" B1 out at "+bridge1OutAt+", next "+bridge1OutNext+", to "+bridge1OutTo);
         //print("  bridge1 next: "+bridge1PosNext+" - "+bridge1FacNext);
         //print("  bridge2 next: "+bridge2PosNext+" - "+bridge2FacNext);
 
-        Object.Teleport(P1Base, basePosNext, baseFacNext);
-        Object.Teleport(P1Bridge1, bridge1PosNext, bridge1FacNext);
-        Object.Teleport(P1Bridge2, bridge2PosNext, bridge2FacNext);
+        Object.Teleport(P1Base, p1basePosNext, p1baseFacNext);
+        Object.Teleport(P1Bridge1, p1bridge1PosNext, p1bridge1FacNext);
+        Object.Teleport(P1Bridge2, p1bridge2PosNext, p1bridge2FacNext);
 
         // stop animating when everything is at its end point/
-        if ((basePosNext-basePosTo).Length()==0.0
-        && (baseFacNext-baseFacTo).Length()==0.0
-        && bridge1OutNext==bridge1OutTo) {
+        if ((p1basePosNext-p1basePosTo).Length()==0.0
+        && (p1baseFacNext-p1baseFacTo).Length()==0.0
+        && p1bridge1OutNext==p1bridge1OutTo) {
             SetData("Animating", false);
         }
 
