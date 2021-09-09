@@ -12,58 +12,108 @@ class AscensionPuzzle extends SqRootScript
     P1Bridge1 = 0;
     P1Bridge2 = 0;
 
-    function OnBeginScript() {
-        if (! IsDataSet("Animating")) SetData("Animating", 0);
-        if (! IsDataSet("P1Rise")) SetData("P1Rise", 0);
-        if (! IsDataSet("P1Rot")) SetData("P1Rot", 0);
-        if (! IsDataSet("P1Bridge1")) SetData("P1Bridge1", 0);
-    }
-
     function OnSim() {
         if (message().starting) {
+            // parts
             P1Base = ObjID("P1Base");
             P1Bridge1 = ObjID("P1Bridge1");
             P1Bridge2 = ObjID("P1Bridge2");
+            // starting positions
             local pos = Property.Get(P1Base, "PhysState", "Location");
             local fac = Property.Get(P1Base, "PhysState", "Facing");
-            SetData("P1BasePos", pos);
-            SetData("P1BaseFac", fac);
-            UpdatePositions();
+            SetData("P1RootPos", pos);
+            SetData("P1RootFac", fac);
+            // initial configuration
+            SetData("Animating", false);
+            SetData("P1Rise", 0);
+            SetData("P1Rot", 0);
+            SetData("P1Bridge1", 0);
+            // apply it!
+            UpdatePositions(1.0);
         }
     }
 
-    function UpdatePositions() {
-        // TODO: animating!
-        local basePos = GetData("P1BasePos");
-        local baseFac = GetData("P1BaseFac");
-        local vRise = GetData("P1Rise").tofloat();
-        local vRot = GetData("P1Rot").tofloat();
-        local vBridge1 = GetData("P1Bridge1").tofloat();
+    function StartAnimating() {
+        if (! GetData("Animating")) {
+            SetData("Animating", true);
+            SetData("PrevFrameTime", GetTime());
+            PostMessage(self, "AnimFrame");
+        }
+    }
 
-        local targetPos = basePos;
-        targetPos += vector(0,0,48)*vRise;
-        local targetFac = baseFac;
-        targetFac += vector(0,0,90)*vRot;
+    function OnAnimFrame() {
+        local t = GetTime();
+        local dt = t-GetData("PrevFrameTime");
+        SetData("PrevFrameTime", t);
+        UpdatePositions(dt);
+        if (GetData("Animating")) PostMessage(self, "AnimFrame");
+    }
 
+
+    function UpdatePositions(dt) {
+        local rootPos = GetData("P1RootPos");
+        local rootFac = GetData("P1RootFac");
+        local fRise = GetData("P1Rise").tofloat();
+        local fRot = GetData("P1Rot").tofloat();
+        local fBridge1 = GetData("P1Bridge1").tofloat();
+
+        local basePosAt = Object.Position(P1Base);
+        local basePosTo = rootPos+vector(0,0,48)*fRise;
+        local baseFacAt = Object.Facing(P1Base);
+        local baseFacTo = rootFac+vector(0,0,90)*fRot;
+        // TODO: cw or ccw needs to be a parameter!
+        local basePosNext;
+        local baseFacNext;
+
+        if (GetData("Animating")) {
+            const MAX_POS_SPEED = 8.0;
+            const MAX_FAC_SPEED = 30.0;
+            local posSpeed = (basePosTo-basePosAt)/dt;
+            local facSpeed = (baseFacTo-baseFacAt)/dt;
+            if (abs(posSpeed.z)>MAX_POS_SPEED) {
+                posSpeed.z = (posSpeed.z<0?-MAX_POS_SPEED:MAX_POS_SPEED);
+                basePosNext = basePosAt+posSpeed*dt;
+            } else {
+                basePosNext = basePosTo;
+            }
+            if (abs(facSpeed.z)>MAX_FAC_SPEED) {
+                facSpeed.z = (facSpeed.z<0?-MAX_FAC_SPEED:MAX_FAC_SPEED);
+                baseFacNext = baseFacAt+facSpeed*dt;
+            } else {
+                baseFacNext = baseFacTo;
+            }
+        } else {
+            basePosNext = basePosTo;
+            baseFacNext = baseFacTo;
+        }
+
+        print("basePos at "+basePosAt.z+", next "+basePosNext.z+", to "+basePosTo.z);
+        print("    Fac at "+baseFacAt.z+", next "+baseFacNext.z+", to "+baseFacTo.z);
+
+        // stop animating when everything is at its end point/
+        if ((basePosNext-basePosTo).Length()==0.0
+        && (baseFacNext-baseFacTo).Length()==0.0) {
+            SetData("Animating", false);
+        }
+
+/*
         const halfpi = 1.5707963267948966;
-        local n1 = vector(cos(vRot*halfpi),sin(vRot*halfpi),0);
+        local n1 = vector(cos(fRot*halfpi),sin(fRot*halfpi),0);
         local n2 = vector(n1.y,-n1.x,0);
 
-        local bridge1TargetPos = targetPos;
-        if (GetData("P1Bridge1"))
-            bridge1TargetPos += n1*17.0;
-        local bridge1TargetFac = targetFac+vector(0,0,90);
-        local bridge2TargetPos = targetPos+n2*17.0;
-        local bridge2TargetFac = targetFac;
+        local bridge1TargetPos = targetPos+n1*17.0*fBridge1*step;
+        local bridge1TargetFac = targetFac+vector(0,0,90)*step;
+        local bridge2TargetPos = targetPos+n2*17.0*step;
+        local bridge2TargetFac = targetFac*step;
 
         print("POSITIONS and FACINGS:");
         print("  base: "+targetPos+" - "+targetFac);
         print("  bridge1: "+bridge1TargetPos+" - "+bridge1TargetFac);
         print("  bridge2: "+bridge2TargetPos+" - "+bridge2TargetFac);
-
-        Object.Teleport(P1Base, targetPos, targetFac);
-        Object.Teleport(P1Bridge1, bridge1TargetPos, bridge1TargetFac);
-        Object.Teleport(P1Bridge2, bridge2TargetPos, bridge2TargetFac);
+*/
+        Object.Teleport(P1Base, basePosNext, baseFacNext);
+        //Object.Teleport(P1Bridge1, bridge1TargetPos, bridge1TargetFac);
+        //Object.Teleport(P1Bridge2, bridge2TargetPos, bridge2TargetFac);
 
         //// this moves the physics box, but not the visible object!
         // Property.Set(P1Base, "PhysState", "Location", targetPos);
@@ -84,7 +134,7 @@ class AscensionPuzzle extends SqRootScript
         } else if (message().from==ObjID("P1RiseSwitch")) {
             SetData("P1Rise", 1);
         }
-        UpdatePositions();
+        StartAnimating();
     }
 
     function OnTurnOff() {
@@ -99,7 +149,7 @@ class AscensionPuzzle extends SqRootScript
         } else if (message().from==ObjID("P1RiseSwitch")) {
             SetData("P1Rise", 0);
         }
-        UpdatePositions();
+        StartAnimating();
     }
 /*
     function OnPlatStarted() {
