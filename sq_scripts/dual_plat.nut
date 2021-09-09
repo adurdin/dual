@@ -27,6 +27,7 @@ class AscensionPuzzle extends SqRootScript
             SetData("Animating", false);
             SetData("P1Rise", 0);
             SetData("P1Rot", 0);
+            SetData("P1RotDir", 1);
             SetData("P1Bridge1", 0);
             // apply it!
             UpdatePositions(1.0);
@@ -49,71 +50,99 @@ class AscensionPuzzle extends SqRootScript
         if (GetData("Animating")) PostMessage(self, "AnimFrame");
     }
 
-
     function UpdatePositions(dt) {
         local rootPos = GetData("P1RootPos");
         local rootFac = GetData("P1RootFac");
         local fRise = GetData("P1Rise").tofloat();
         local fRot = GetData("P1Rot").tofloat();
+        local fRotDir = GetData("P1RotDir").tofloat();
         local fBridge1 = GetData("P1Bridge1").tofloat();
 
         local basePosAt = Object.Position(P1Base);
         local basePosTo = rootPos+vector(0,0,48)*fRise;
         local baseFacAt = Object.Facing(P1Base);
         local baseFacTo = rootFac+vector(0,0,90)*fRot;
-        // TODO: cw or ccw needs to be a parameter!
+
+        // Move the base
         local basePosNext;
         local baseFacNext;
-
         if (GetData("Animating")) {
             const MAX_POS_SPEED = 8.0;
             const MAX_FAC_SPEED = 30.0;
             local posSpeed = (basePosTo-basePosAt)/dt;
-            local facSpeed = (baseFacTo-baseFacAt)/dt;
             if (abs(posSpeed.z)>MAX_POS_SPEED) {
                 posSpeed.z = (posSpeed.z<0?-MAX_POS_SPEED:MAX_POS_SPEED);
                 basePosNext = basePosAt+posSpeed*dt;
             } else {
                 basePosNext = basePosTo;
             }
+
+            if (fRotDir>0) {
+                // CCW - we require To > At
+                if (baseFacTo.z<baseFacAt.z)
+                    baseFacTo.z += 360;
+            } else {
+                // CW - we require To < At
+                if (baseFacTo.z>baseFacAt.z)
+                    baseFacAt.z += 360;
+            }
+            local facSpeed = (baseFacTo-baseFacAt)/dt;
             if (abs(facSpeed.z)>MAX_FAC_SPEED) {
                 facSpeed.z = (facSpeed.z<0?-MAX_FAC_SPEED:MAX_FAC_SPEED);
                 baseFacNext = baseFacAt+facSpeed*dt;
             } else {
                 baseFacNext = baseFacTo;
             }
+            // keep Next in range
+            baseFacNext.z %= 360;
         } else {
             basePosNext = basePosTo;
             baseFacNext = baseFacTo;
         }
 
+        // Move the bridges
+        const pi = 3.141592653589793;
+        local a = baseFacNext.z*pi/180.0;
+        local n1 = vector(cos(a),sin(a),0);
+        local n2 = vector(n1.y,-n1.x,0);
+        // Bridge 1 can extend and retract
+        local bridge1OutAt = (Object.Position(P1Bridge1)-basePosAt).Dot(n1);
+        local bridge1OutTo = fBridge1*17.0;
+        local bridge1OutNext;
+        if (GetData("Animating")) {
+            const MAX_BRIDGE_SPEED = 4.0;
+            local outSpeed = (bridge1OutTo-bridge1OutAt)/dt;
+            if (abs(outSpeed)>MAX_BRIDGE_SPEED) {
+                outSpeed = (outSpeed<0?-MAX_BRIDGE_SPEED:MAX_BRIDGE_SPEED);
+                bridge1OutNext = bridge1OutAt+outSpeed*dt;
+            } else {
+                bridge1OutNext = bridge1OutTo;
+            }
+        } else {
+            bridge1OutNext = bridge1OutTo;
+        }
+        local bridge1PosNext = basePosNext+n1*bridge1OutNext;
+        local bridge1FacNext = baseFacNext+vector(0,0,90);
+        local bridge2PosNext = basePosNext+n2*17.0;
+        local bridge2FacNext = baseFacNext;
+
+        //print("POSITIONS and FACINGS:");
         print("basePos at "+basePosAt.z+", next "+basePosNext.z+", to "+basePosTo.z);
         print("    Fac at "+baseFacAt.z+", next "+baseFacNext.z+", to "+baseFacTo.z);
+        print(" B1 out at "+bridge1OutAt+", next "+bridge1OutNext+", to "+bridge1OutTo);
+        //print("  bridge1 next: "+bridge1PosNext+" - "+bridge1FacNext);
+        //print("  bridge2 next: "+bridge2PosNext+" - "+bridge2FacNext);
+
+        Object.Teleport(P1Base, basePosNext, baseFacNext);
+        Object.Teleport(P1Bridge1, bridge1PosNext, bridge1FacNext);
+        Object.Teleport(P1Bridge2, bridge2PosNext, bridge2FacNext);
 
         // stop animating when everything is at its end point/
         if ((basePosNext-basePosTo).Length()==0.0
-        && (baseFacNext-baseFacTo).Length()==0.0) {
+        && (baseFacNext-baseFacTo).Length()==0.0
+        && bridge1OutNext==bridge1OutTo) {
             SetData("Animating", false);
         }
-
-/*
-        const halfpi = 1.5707963267948966;
-        local n1 = vector(cos(fRot*halfpi),sin(fRot*halfpi),0);
-        local n2 = vector(n1.y,-n1.x,0);
-
-        local bridge1TargetPos = targetPos+n1*17.0*fBridge1*step;
-        local bridge1TargetFac = targetFac+vector(0,0,90)*step;
-        local bridge2TargetPos = targetPos+n2*17.0*step;
-        local bridge2TargetFac = targetFac*step;
-
-        print("POSITIONS and FACINGS:");
-        print("  base: "+targetPos+" - "+targetFac);
-        print("  bridge1: "+bridge1TargetPos+" - "+bridge1TargetFac);
-        print("  bridge2: "+bridge2TargetPos+" - "+bridge2TargetFac);
-*/
-        Object.Teleport(P1Base, basePosNext, baseFacNext);
-        //Object.Teleport(P1Bridge1, bridge1TargetPos, bridge1TargetFac);
-        //Object.Teleport(P1Bridge2, bridge2TargetPos, bridge2TargetFac);
 
         //// this moves the physics box, but not the visible object!
         // Property.Set(P1Base, "PhysState", "Location", targetPos);
@@ -131,6 +160,7 @@ class AscensionPuzzle extends SqRootScript
             local rot = GetData("P1Rot");
             rot = (rot+3)%4;
             SetData("P1Rot", rot);
+            SetData("P1RotDir", -1);
         } else if (message().from==ObjID("P1RiseSwitch")) {
             SetData("P1Rise", 1);
         }
@@ -146,101 +176,13 @@ class AscensionPuzzle extends SqRootScript
             local rot = GetData("P1Rot");
             rot = (rot+1)%4;
             SetData("P1Rot", rot);
+            SetData("P1RotDir", 1);
         } else if (message().from==ObjID("P1RiseSwitch")) {
             SetData("P1Rise", 0);
         }
         StartAnimating();
     }
-/*
-    function OnPlatStarted() {
-        print(message().message + " from " + Object.GetName(message().from));
-        SetRisingMode(true);
-        // okay, with this we _can_ rotate an object that is PhysAttached
-        // to the elevator! cant stand on it though (with or without the
-        // rotation, which is odd? but can live without).
-        SetData("PrevTime", GetTime());
-        PostMessage(self, "Foo");
-    }
 
-    function OnPlatReachedWaypoint() {
-        print(message().message + " from " + Object.GetName(message().from));
-        local pt = message().data;
-        //if (pt==ObjID("P1TopPt")) {
-        //} else if (pt==ObjID("P1BottomPt")) {
-        //}
-        SetRisingMode(false);
-    }
-
-    function OnFoo() {
-        local dt = GetTime()-GetData("PrevTime");
-        local o = ObjID("P1Bridge1Rising");
-        local fac = Property.Get(o, "PhysState", "Facing");
-        fac.z = fac.z + 30*dt;
-        //fac.z = 3.14/2;
-        Property.Set(o, "PhysState", "Facing", fac);
-        print("fac: " + fac);
-        if (GetData("RisingMode")) {
-            SetData("PrevTime", GetTime());
-            PostMessage(self, "Foo");
-        }
-    }
-
-    function SetRisingMode(risingMode) {
-        print("SetRisingMode: "+risingMode);
-        SetData("RisingMode", risingMode);
-        local P1Rise = ObjID("P1Rise");
-        local P1Bridge1 = ObjID("P1Bridge1");
-        local P1Bridge2 = ObjID("P1Bridge2");
-        local P1Bridge1Rising = ObjID("P1Bridge1Rising");
-        local P1Bridge2Rising = ObjID("P1Bridge2Rising");
-        local P1Bridge1Vis = ObjID("P1Bridge1Vis");
-
-        // Link.DestroyMany("PhysAttach", "*", P1Rise);
-        // if (risingMode) {
-        //     Link.Create("PhysAttach", P1Bridge1, P1Rise);
-        //     Link.Create("PhysAttach", P1Bridge2, P1Rise);
-        // }
-
-        // Property.SetSimple(P1Bridge1, "CollisionType", risingMode?COLLTYPE_NONE:COLLTYPE_BOUNCE);
-        // Property.SetSimple(P1Bridge2, "CollisionType", risingMode?COLLTYPE_NONE:COLLTYPE_BOUNCE);
-        // Property.SetSimple(P1Bridge1Rising, "CollisionType", risingMode?COLLTYPE_BOUNCE:COLLTYPE_NONE);
-        // Property.SetSimple(P1Bridge2Rising, "CollisionType", risingMode?COLLTYPE_BOUNCE:COLLTYPE_NONE);
-        // local pos = Object.Position(risingMode?P1Bridge1:P1Bridge1Rising);
-        // local fac = Object.Facing(risingMode?P1Bridge1:P1Bridge1Rising);
-        // Object.Teleport(risingMode?P1Bridge1Rising:P1Bridge1, pos, fac);
-        // Link.DestroyMany("DetailAttachement", P1Bridge1Vis, "*");
-        // local link = Link.Create("DetailAttachement", P1Bridge1Vis, risingMode?P1Bridge1Rising:P1Bridge1);
-    }
-*/
-/*
-    function Reset() {
-        SetData("P1Rot", 0);
-        SetData("P1Rise", 0);
-        SetData("P1Bridge1", 0);
-        SetData("P2Rot", 0);
-        SetData("P2Rise", 0);
-        SetData("P2Bridge1", 0);
-    }
-
-    function Endgame() {
-        // TODO
-    }
-
-    function ToggleVar(var) {
-        local v = GetData(var);
-        v = (v ? 0 : 1);
-        SetData(var, v);
-        Update();
-    }
-
-    function RotateVar(var, direction) {
-        // positive direction is anticlockwise
-        local v = GetData(var);
-        v = v+direction.tointeger()%4;
-        v = (v+4)%4;
-        SetData(var, v);
-    }
-*/
     /* messages from levers and knobs */
 /*
     function OnP1ToggleBridge1() {
@@ -275,20 +217,6 @@ class AscensionPuzzle extends SqRootScript
         RotateVar("P1Rot", 1);
         RotateVar("P2Rot", 1);
         Update();
-    }
-*/
-    /* messages from platforms */
-
-    // TODO
-
-    /* manage all the things! */
-/*
-    function Update() {
-        // add and remove links. move the elevators. rotate the doors.
-        // extend the platforms. just a whole ton of things to do!
-        // and keep track of if we are in motion or not.
-
-        // TODO
     }
 */
 }
