@@ -162,7 +162,11 @@ class AscensionPuzzle extends SqRootScript
             SetData("P1Rot", rot);
             SetData("P1RotDir", -1);
         } else if (message().from==ObjID("P1RiseSwitch")) {
-            SetData("P1Rise", 1);
+            if (GetData("P1Rise")==0) {
+                SetData("P1Rise", 1);
+            } else {
+                SetData("P1Rise", 0);
+            }
         }
         StartAnimating();
     }
@@ -171,14 +175,8 @@ class AscensionPuzzle extends SqRootScript
         if (message().from==ObjID("P1Bridge1Switch")) {
             SetData("P1Rise", 0);
             SetData("P1Rot", 0);
+            SetData("P1RotDir", -1);
             SetData("P1Bridge1", 0);
-        } else if (message().from==ObjID("P1RotSwitch")) {
-            local rot = GetData("P1Rot");
-            rot = (rot+1)%4;
-            SetData("P1Rot", rot);
-            SetData("P1RotDir", 1);
-        } else if (message().from==ObjID("P1RiseSwitch")) {
-            SetData("P1Rise", 0);
         }
         StartAnimating();
     }
