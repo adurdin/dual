@@ -66,11 +66,22 @@ class WispTurbHatch extends SqRootScript
         SetProperty("StTweqJoints", "Joint2AnimS", Joint2AnimS);
     }
 
-    function OnBeginScript() {
-        if (! IsDataSet("IsLoaded")) SetData("IsLoaded", false);
+    function IsLoaded() {
+        return Link.AnyExist("Owns", self);
+    }
+
+    function IsCharged() {
+        local link = Link.GetOne("Owns", self);
+        if (link
+        && Object.InheritsFrom(LinkDest(link), "ChargedWispBox")) {
+            return true;
+        }
+        return false;
     }
 
     function OnFrobWorldEnd() {
+        // Toggle the hatch from open to closed. Allow it to be
+        // interrupted mid-animation.
         local state = GetState();
         if (state==eWispTurbHatchState.kClosed) {
             Link.BroadcastOnAllLinks(self, "TurnOff", "ControlDevice");
@@ -84,17 +95,47 @@ class WispTurbHatch extends SqRootScript
     }
 
     function OnTweqComplete() {
+        // When the hatch finishes opening:
+        //   - Nothing special
+        // When the hatch finishes closing:
+        //   - If loaded with a charged box, turn on our CD'd turbine.
+        //   - If loaded with an empty box, unload and disown it.
         local state = GetState();
         if (state==eWispTurbHatchState.kClosed
-        && GetData("IsLoaded")) {
-            Link.BroadcastOnAllLinks(self, "TurnOn", "ControlDevice");
+        && IsLoaded()) {
+            if (IsCharged()) {
+                Link.BroadcastOnAllLinks(self, "TurnOn", "ControlDevice");
+            } else {
+                // TODO: play a rejection sound
+                SetState(eWispTurbHatchState.kOpening);
+                UnloadBox();
+            }
         }
     }
 
     function LoadBox(box) {
         Container.Remove(box);
+        if (! Link.AnyExist("Owns", self, box)) {
+            Link.Create("Owns", self, box);
+        }
+        if (! Object.HasMetaProperty(box, "FrobInert")) {
+            Object.AddMetaProperty(box, "FrobInert");
+        }
         Object.Teleport(box, vector(), vector(), self);
-        Object.AddMetaProperty(box, "FrobInert");
+    }
+
+    function UnloadBox() {
+        local link = Link.GetOne("Owns", self);
+        if (link) {
+            local box = LinkDest(link);
+            Object.RemoveMetaProperty(box, "FrobInert");
+            // We do not destroy the 'Owns' link here; that will
+            // be done by the box when it is picked up. And at that
+            // point it will tell us to enable frobs again.
+            if (! Object.HasMetaProperty(self, "FrobInert")) {
+                Object.AddMetaProperty(self, "FrobInert");
+            }
+        }
     }
 
     function OnLoadWispBox() {
@@ -107,14 +148,18 @@ class WispTurbHatch extends SqRootScript
         //   - reject the box, but start opening the hatch.
         //
         // In any other circumstances, reject the box.
+        local box = message().from;
+        if (! Object.InheritsFrom(box, "WispBox")) {
+            Reply(false);
+            return;
+        }
         local state = GetState();
         if (state==eWispTurbHatchState.kOpen) {
-            if (GetData("IsLoaded")) {
-                // We don't need your stinking box!
+            if (IsLoaded()) {
+                // Already have a box!
                 Reply(false);
             } else {
                 LoadBox(message().from);
-                SetData("IsLoaded", true);
                 Reply(true);
             }
         } else if (state==eWispTurbHatchState.kClosed
@@ -126,18 +171,15 @@ class WispTurbHatch extends SqRootScript
             Reply(false);
         }
     }
+
+    function OnUnloadWispBox() {
+        Object.RemoveMetaProperty(self, "FrobInert");
+    }
 }
 
 class WispBox extends SqRootScript
 {
     function OnFrobToolEnd() {
-        print(self+" - "+message().message);
-        print("  Src: "+message().SrcObjId);
-        print("  Dst: "+message().DstObjId);
-        print("  Frobber: "+message().Frobber);
-        print("  SrcLoc: "+message().SrcLoc);
-        print("  DstLoc: "+message().DstLoc);
-
         local target = message().DstObjId;
         local isHatch = Object.InheritsFrom(target, "WispTurbHatch");
         if (isHatch) {
@@ -146,6 +188,14 @@ class WispBox extends SqRootScript
         } else {
             // Not a turbine hatch. Why would you use this here??
             Reply(false);
+        }
+    }
+
+    function OnFrobWorldEnd() {
+        local link = Link.GetOne("~Owns", self);
+        if (link) {
+            SendMessage(LinkDest(link), "UnloadWispBox");
+            Link.Destroy(link);
         }
     }
 }
