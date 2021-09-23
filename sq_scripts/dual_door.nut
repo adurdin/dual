@@ -22,11 +22,17 @@ class SyncDoorJoints extends SqRootScript
     }
 }
 
-/* Move the door seal out, then let it fall */
+/* The big stone seals for the RollingStone doors. */
 class DoorSeal extends SqRootScript
 {
     function OnFrobWorldEnd() {
+        // Unlock ourself:
         Object.RemoveMetaProperty(self, "LockedDoorSeal");
+        // Huh. If I use the short version SetProperty("Locked", false) here,
+        // then it makes the game crash! So, just use the full version:
+        SetProperty("Locked", "", false);
+
+        // Move the door seal out, then let it fall:
         SetProperty("PhysControl", "Controls Active", 0);
         local pos = Object.Position(self);
         local vel_rel = vector(0,-10.0,10.0);
