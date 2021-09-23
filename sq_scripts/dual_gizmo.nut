@@ -51,45 +51,48 @@ class WispTurbCavity extends SqRootScript
         return true;
     }
 
-    function OnTurnOn() {
-        // TurnOn means, enable loading/unloading the cavity and its
+    function OnHatchOpen() {
+        // HatchOpen means, enable loading/unloading the cavity and its
         // owned box (if any).
         if (IsLoaded()) {
             local box = GetBox();
             Object.RemoveMetaProperty(box, "FrobInert");
-            print(message().message+": Loaded; allow BOX to be frobbed.");
         } else {
             Object.RemoveMetaProperty(self, "FrobInert");
-            print(message().message+": Not loaded; allow self to be frobbed.");
         }
     }
 
-    function OnTurnOff() {
-        // TurnOn means, dosable loading/unloading the cavity and its
+    function OnHatchClosing() {
+        // HatchClosing means, dosable loading/unloading the cavity and its
         // owned box (if any).
         if (! Object.HasMetaProperty(self, "FrobInert")) {
             Object.AddMetaProperty(self, "FrobInert");
-            print(message().message+": disallow self to be frobbed.");
         }
         if (IsLoaded()) {
             local box = GetBox();
             if (! Object.HasMetaProperty(box, "FrobInert")) {
                 Object.AddMetaProperty(box, "FrobInert");
-                print(message().message+": disallow BOX to be frobbed.");
             }
         }
     }
 
+    function OnHatchClosed() {
+        // Make sure things are frob-disabled when the hatch finishes
+        // closing (or starts closed!)
+        OnHatchClosing();
+
+        local box = GetBox();
+        if (box) SendMessage(box, "TurnOff")
+    }
+
+    function OnHatchOpening() {
+        local box = GetBox();
+        if (box) SendMessage(box, "TurnOn")
+    }
+
     function OnLoadWispBox() {
-        // We will accept a wisp box, if:
-        //   - the wisp box is charged (dilemma!)
-        //   - we aren't already loaded
-        //   - the hatch is open
-        //
-        // If the hatch is closed or closing:
-        //   - reject the box, but start opening the hatch.
-        //
-        // In any other circumstances, reject the box.
+        // When we load a box, stop being frobbable.
+        // If the box is charged, turn on our CD'd devices.
         local box = message().from;
         if (! Object.InheritsFrom(box, "WispBox")) {
             print(message().message+": not a box.");
@@ -98,20 +101,19 @@ class WispTurbCavity extends SqRootScript
         }
         if (IsLoaded()) {
             // Already have a box!
-            print(message().message+": already loaded.");
             Reply(false);
         } else {
-            print(message().message+": accept the box.");
             // When we have a loaded box, stop being frobbable.
             // If the box is charged, turn on our CD'd devices.
             Container.Remove(box);
             if (! Link.AnyExist("Owns", self, box)) {
                 Link.Create("Owns", self, box);
             }
-            Object.Teleport(box, vector(), vector(), self);
+            // The cavity origin is a little off-center because of its
+            // front angles. So just hack that here.
+            Object.Teleport(box, vector(-0.25,0,0), vector(), self);
             if (! Object.HasMetaProperty(self, "FrobInert")) {
                 Object.AddMetaProperty(self, "FrobInert");
-                print(message().message+": disallow self to be frobbed.");
             }
             if (IsCharged()) {
                 print(message().message+": sending TurnOn.");
@@ -125,7 +127,6 @@ class WispTurbCavity extends SqRootScript
         // When we lose our loaded box, start being frobbable, if
         // our hatch permits.
         // If the box is charged, turn off our CD'd devices.
-        print(message().message+": ??? allow BOX to be frobbed???");
         local link = Link.GetOne("Owns", self);
         if (link) {
             local box = LinkDest(link);
@@ -135,7 +136,6 @@ class WispTurbCavity extends SqRootScript
             }
             if (IsHatchOpen()) {
                 Object.RemoveMetaProperty(self, "FrobInert");
-                print(message().message+": allow self to be frobbed.");
             }
             Link.Destroy(link);
         }
@@ -195,11 +195,7 @@ class WispTurbHatch extends SqRootScript
 
     function OnSim() {
         if (message().starting) {
-            if (GetState()==eWispTurbHatchState.kOpen) {
-                Link.BroadcastOnAllLinks(self, "TurnOn", "ControlDevice");
-            } else {
-                Link.BroadcastOnAllLinks(self, "TurnOff", "ControlDevice");
-            }
+            BroadcastStateMessage();
         }
     }
 
@@ -208,7 +204,23 @@ class WispTurbHatch extends SqRootScript
         if (state==eWispTurbHatchState.kClosed
         || state==eWispTurbHatchState.kClosing) {
             SetState(eWispTurbHatchState.kOpening);
+            BroadcastStateMessage();
         }
+    }
+
+    function BroadcastStateMessage() {
+        local state = GetState();
+        local msg;
+        if (state==eWispTurbHatchState.kClosed) {
+            msg = "HatchClosed";
+        } else if (state==eWispTurbHatchState.kOpening) {
+            msg = "HatchOpening";
+        } else if (state==eWispTurbHatchState.kOpen) {
+            msg = "HatchOpen";
+        } else {
+            msg = "HatchClosing";
+        }
+        Link.BroadcastOnAllLinks(self, msg, "ControlDevice");
     }
 
     function OnFrobWorldEnd() {
@@ -216,23 +228,18 @@ class WispTurbHatch extends SqRootScript
         // interrupted mid-animation.
         // When the hatch starts closing, tell our CD'd cavity to turn off.
         local state = GetState();
-        if (state==eWispTurbHatchState.kOpen) {
-            Link.BroadcastOnAllLinks(self, "TurnOff", "ControlDevice");
-        }
         if (state==eWispTurbHatchState.kClosed
         || state==eWispTurbHatchState.kClosing) {
             SetState(eWispTurbHatchState.kOpening);
         } else {
             SetState(eWispTurbHatchState.kClosing);
         }
+        BroadcastStateMessage();
     }
 
     function OnTweqComplete() {
         // When the hatch finishes opening, tell our CD'd cavity to turn on.
-        local state = GetState();
-        if (state==eWispTurbHatchState.kOpen) {
-            Link.BroadcastOnAllLinks(self, "TurnOn", "ControlDevice");
-        }
+        BroadcastStateMessage();
     }
 }
 
@@ -257,6 +264,26 @@ class WispBox extends SqRootScript
         local link = Link.GetOne("~Owns", self);
         if (link) {
             SendMessage(LinkDest(link), "UnloadWispBox");
+        }
+    }
+
+    function OnTurnOn() {
+        if (HasProperty("SelfLit")) {
+            local brightness = 10.0;
+            if (IsDataSet("Brightness")) {
+                brightness = GetData("Brightness");
+            }
+            SetProperty("SelfLit", brightness);
+        }
+    }
+
+    function OnTurnOff() {
+        if (HasProperty("SelfLit")) {
+            local brightness = GetProperty("SelfLit");
+            if (! IsDataSet("Brightness")) {
+                SetData("Brightness", brightness);
+            }
+            SetProperty("SelfLit", 0.0);
         }
     }
 }
