@@ -21,3 +21,20 @@ class SyncDoorJoints extends SqRootScript
         TweqJoints(TWEQ_AS_ONOFF|TWEQ_AS_REVERSE);
     }
 }
+
+/* Move the door seal out, then let it fall */
+class DoorSeal extends SqRootScript
+{
+    function OnFrobWorldEnd() {
+        Object.RemoveMetaProperty(self, "LockedDoorSeal");
+        SetProperty("PhysControl", "Controls Active", 0);
+        local pos = Object.Position(self);
+        local vel_rel = vector(0,-10.0,10.0);
+        local vel_abs = Object.ObjectToWorld(self, vel_rel) - pos;
+        local rot_rel = vector(2.0,0,0);
+        local rot_abs = Object.ObjectToWorld(self, rot_rel) - pos;
+        Physics.SetVelocity(self, vel_abs);
+        SetProperty("PhysState", "Rot Velocity", rot_abs);
+    }
+
+}
