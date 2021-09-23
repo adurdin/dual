@@ -32,9 +32,9 @@ class DoorSeal extends SqRootScript
         // Move the door seal out, then let it fall:
         SetProperty("PhysControl", "Controls Active", 0);
         local pos = Object.Position(self);
-        local vel_rel = vector(0,-8.0,5.0);
+        local vel_rel = vector(-8.0,0,5.0);
         local vel_abs = Object.ObjectToWorld(self, vel_rel) - pos;
-        local rot_rel = vector(2.0,0,0);
+        local rot_rel = vector(0,-2.0,0);
         local rot_abs = Object.ObjectToWorld(self, rot_rel) - pos;
         Physics.SetVelocity(self, vel_abs);
         SetProperty("PhysState", "Rot Velocity", rot_abs);
