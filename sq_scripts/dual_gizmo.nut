@@ -287,3 +287,52 @@ class WispBox extends SqRootScript
         }
     }
 }
+
+
+class DebugWispInv extends SqRootScript
+{
+    function OnContained() {
+        print(message().message);
+    }
+
+    function OnInvSelect() {
+        print(message().message);
+        SetData("Selected", true);
+        SendMessage(self, "UpdateInv");
+    }
+
+    function OnUpdateInv() {
+        local t = (GetTime()*-8.4375*10)%360.0;
+        local fac = Object.Facing(self);
+        local camfac = Camera.GetFacing();
+        print("cam facing: " + camfac);
+
+        if (camfac.y>180.0) camfac.y-=360.0;
+        // This is the compass2 angle calculation from drkinvui.
+        local pitch_factor = 0.25*camfac.y;
+        if (pitch_factor < -5.625)
+           pitch_factor=((pitch_factor+5.625)*5)+(-5.625);
+        else if (pitch_factor < -8.4375)
+           pitch_factor=((pitch_factor+8.4375)*2)+(-19.6875);
+        else if (pitch_factor > 5.625)
+           pitch_factor=((pitch_factor-5.625)*2)+(5.625);
+        local camy = -25.3125 - pitch_factor;
+
+        // Joint 1: compensate for compass z rotation
+        SetProperty("JointPos", "Joint 1", (fac.z+270.0)%360.0);
+        // Joint 2: compensate for compass y rotation
+        SetProperty("JointPos", "Joint 2", (camy+360.0+20.0)%360.0);
+        // Joint 3: rotate the box like an ordinary inventory item!
+        SetProperty("JointPos", "Joint 3", t%360.0);
+        // Joint 4: counter-rotate the fake particles!
+        SetProperty("JointPos", "Joint 4", (360.0-t)%360.0);
+        if (GetData("Selected")) {
+            PostMessage(self, "UpdateInv");
+        }
+    }
+
+    function OnInvDeSelect() {
+        print(message().message);
+        SetData("Selected", false);
+    }
+}
