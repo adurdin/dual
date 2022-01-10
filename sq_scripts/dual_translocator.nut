@@ -222,6 +222,13 @@ class DualController extends SqRootScript
             // based on the closest origin. Then ending up in the wrong world by accident will
             // self-correct next time the player translocates.
 
+            // Update the Dual Offset
+            local pControl = ObjID("PeriaptController");
+            if (pControl) {
+                local next_world_index = NextWorldIndex(current_world_index);
+                local offset = WorldPos(vector(), current_world_index, next_world_index);
+                SendMessage(pControl, "SetDualOffset", offset);
+            }
         } else /* ! valid */ {
             // Translocating now would put us inside a wall or something. That's not great.
             Sound.PlayVoiceOver(player, "blue_light_off");
