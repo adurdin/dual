@@ -2,8 +2,24 @@ class DualTranslocator extends SqRootScript
 {
     function OnFrobInvBegin() {
         // Translocate
+        // TODO: if this is going to take time, we might want
+        //       to check message.Abort! see the BlackJack
+        //       script for an example
         local controller = Object.Named("DualController");
         SendMessage(controller, "Translocate");
+    }
+
+    function OnFrobToolBegin() {
+        local controller = Object.Named("DualController");
+        SendMessage(controller, "Translocate");
+    }
+
+    function OnInvSelect() {
+        Weapon.Equip(self);
+    }
+
+    function OnInvDeSelect() {
+        Weapon.UnEquip(self);
     }
 }
 

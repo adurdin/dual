@@ -1,0 +1,3 @@
+Frying pan viewmodel (panhand.bin/pan02.gif) by Eshaktaar, from Ominous Bequest.
+
+// TODO: remove the frying pan when i have the proper viewmodel
