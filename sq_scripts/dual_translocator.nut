@@ -116,6 +116,18 @@ class DualController extends SqRootScript
             autoprobe_timer = SetOneShotTimer(autoprobe_name, autoprobe_period);
         }
         */
+
+        local pControl = ObjID("PeriaptController");
+        if (pControl) {
+            local next_world_index = NextWorldIndex(current_world_index);
+            local offset = WorldPos(vector(), current_world_index, next_world_index);
+            SendMessage(pControl, "SetDualOffset", offset);
+            SendMessage(pControl, "SetDualRender", true);
+            SendMessage(pControl, "SetDualCull", true);
+            SendMessage(pControl, "SetDualCullRect", vector(0.5,0.25,0), vector(1,1,0));
+            SendMessage(pControl, "SetDepthCull", true);
+            SendMessage(pControl, "SetDepthDistance", 192.0);
+        }
     }
 
     function FindAllWorlds() {
