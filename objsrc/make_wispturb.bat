@@ -11,8 +11,8 @@ copy /y wisphatch.bin ..\obj\
 copy /y wispcavity.bin ..\obj\
 copy /y wispbox.bin ..\obj\
 copy /y wispbox2.bin ..\obj\
-copy /y graytfr.png ..\obj\txt\
-copy /y graytsd.png ..\obj\txt\
-copy /y grayturb.png ..\obj\txt\
-copy /y towarm.png ..\obj\txt\
-copy /y wispball.png ..\obj\txt\
+copy /y graytfr.png ..\obj\txt16\
+copy /y graytsd.png ..\obj\txt16\
+copy /y grayturb.png ..\obj\txt16\
+copy /y towarm.png ..\obj\txt16\
+copy /y wispball.png ..\obj\txt16\

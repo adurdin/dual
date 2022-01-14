@@ -7,5 +7,5 @@ copy /y col14x4.bin ..\obj\
 copy /y cols14x4.bin ..\obj\
 copy /y col28x4.bin ..\obj\
 copy /y cols28x4.bin ..\obj\
-copy /y col01.png ..\obj\txt\
-copy /y col02.png ..\obj\txt\
+copy /y col01.png ..\obj\txt16\
+copy /y col02.png ..\obj\txt16\
