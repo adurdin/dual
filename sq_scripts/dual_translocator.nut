@@ -1,17 +1,11 @@
 class DualTranslocator extends SqRootScript
 {
     function OnFrobInvBegin() {
-        // Translocate
-        // TODO: if this is going to take time, we might want
-        //       to check message.Abort! see the BlackJack
-        //       script for an example
-        local controller = Object.Named("DualController");
-        SendMessage(controller, "Translocate");
+        DoTranslocate();
     }
 
     function OnFrobToolBegin() {
-        local controller = Object.Named("DualController");
-        SendMessage(controller, "Translocate");
+        DoTranslocate();
     }
 
     function OnInvSelect() {
@@ -20,6 +14,31 @@ class DualTranslocator extends SqRootScript
 
     function OnInvDeSelect() {
         Weapon.UnEquip(self);
+    }
+
+    function DoTranslocate() {
+        // Translocate
+        // TODO: if this is going to take time, we might want
+        //       to check message.Abort! see the BlackJack
+        //       script for an example
+        // TODO: throw away DualController, and get everything into
+        //       PeriaptController?
+        local pControl = ObjID("PeriaptController");
+        local dControl = Object.Named("DualController");
+        local ok = SendMessage(pControl, "Translocate");
+        if (ok) {
+            SendMessage(dControl, "Translocate");
+        }
+    }
+
+    // TEMP: for testing the viewmodel
+    function OnSim() {
+        if (message().starting) {
+            PostMessage(self, "SelectMe");
+        }
+    }
+    function OnSelectMe() {
+        Debug.Command("inv_select Translocator");
     }
 }
 
@@ -124,7 +143,6 @@ class DualController extends SqRootScript
             SendMessage(pControl, "SetDualOffset", offset);
             SendMessage(pControl, "SetDualRender", true);
             SendMessage(pControl, "SetDualCull", true);
-            SendMessage(pControl, "SetDualCullRect", vector(0.5,0.25,0), vector(1,1,0));
             SendMessage(pControl, "SetDepthCull", true);
             SendMessage(pControl, "SetDepthDistance", 192.0);
         }
