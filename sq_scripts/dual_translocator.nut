@@ -30,7 +30,7 @@ class DualTranslocator extends SqRootScript
             SendMessage(dControl, "Translocate");
         }
     }
-
+/*
     // TEMP: for testing the viewmodel
     function OnSim() {
         if (message().starting) {
@@ -40,6 +40,7 @@ class DualTranslocator extends SqRootScript
     function OnSelectMe() {
         Debug.Command("inv_select Translocator");
     }
+*/
 }
 
 // All these are right out of PHYSAPI.H
