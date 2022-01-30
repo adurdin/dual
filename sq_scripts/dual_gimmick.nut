@@ -1,6 +1,6 @@
 class SimpleWobbleDummy extends SqRootScript
 {
-    function OnDamage() {
+    function Wobble() {
         if (GetProperty("StTweqRotate", "AnimS") != 0)
             return;
         SetProperty("CfgTweqRotate", "Halt", TWEQ_HALT_STOP);
@@ -12,6 +12,20 @@ class SimpleWobbleDummy extends SqRootScript
         SetProperty("CfgTweqRotate", "y rate-low-high", vector(15,0,5));
         SetProperty("CfgTweqRotate", "z rate-low-high", vector());
         SetProperty("StTweqRotate", "AnimS", TWEQ_AS_ONOFF);
+    }
+
+    function OnDamage() {
+        Wobble();
+    }
+
+    function OnBashStimStimulus() {
+        // Should still wobble when hit with a wooden sword.
+        Wobble();
+    }
+
+    function OnSlashStimStimulus() {
+        // Should still wobble when hit with a wooden sword.
+        Wobble();
     }
 }
 
@@ -152,6 +166,21 @@ class WobbleDummyVisible extends SqRootScript
 
 class Sparring extends SqRootScript
 {
+    /* BUGS:
+        1. they keep trying to do this even if they are KOd or dead. they cant
+           act then, but will stand up and try to.
+        2. they should not be trying to do this when their target is KOd, or
+           dead, or not nearby.
+        3. if their partner is not available, but the target dummy is, then
+           they should maybe wail on that instead?
+        4. i currently have Broadcasts fully disabled on these guards so their
+           combat shouts dont alert nearby ai to come and investigate. but
+           this is bad for gameplay involving the player. also, the sound of
+           their swords clashing still brings other ais sometimes (and should
+           not be happening with wooden swords). solution: give these guards
+           a custom voice set with combat shouts that dont carry combat value.
+    */
+
     function SparAttack(target) {
         if (! Link.AnyExist("AITarget", self)) {
             // An AITarget link can even force an AI to attack a friendly,
