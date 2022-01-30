@@ -187,9 +187,6 @@ class Sparring extends SqRootScript
             // as long as they're in combat mode. Thanks Firemage!
             SetProperty("AI_Mode", eAIMode.kAIM_Combat);
             Link.Create("AITarget", self, target);
-            print(Object_Description(self)+" attacking "+Object_Description(target));
-        } else {
-            print(Object_Description(self)+" AITarget link exists; not attacking.");
         }
     }
 

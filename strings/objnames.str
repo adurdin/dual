@@ -256,9 +256,12 @@ Name_strnbox: "Strongbox"
 
 ; DUAL
 
-Name_Translocator: "Translocator"
-Name_DoorSeal" "Heavy stone"
-Name_Prybar: "Prybar"
+Name_Basin: "Basin"
+Name_Boot: "Boot"
 Name_BurrickEgg: "Burrick egg"
+Name_DoorSeal" "Heavy stone"
+Name_Helmet: "Helmet"
+Name_Prybar: "Prybar"
 Name_Switch: "Switch"
+Name_Translocator: "Translocator"
 Name_WispBox: "Metal box"
