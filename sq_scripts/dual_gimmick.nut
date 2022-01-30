@@ -166,7 +166,7 @@ class Sparring extends SqRootScript
 
     function OnSim() {
         if (message().starting) {
-            SetOneShotTimer("SparAttack", 1.0);
+            SetOneShotTimer("SparAttack", 0.5+Data.RandFlt0to1());
         }
     }
 
@@ -178,8 +178,9 @@ class Sparring extends SqRootScript
                 // Every two seconds, the AI will re-evaluate its targets. When
                 // that happens, it will see that its target is on the same team,
                 // and so not valid, and will remove it. So we need to repeatedly
-                // re-add it.
-                SetOneShotTimer("SparAttack", 1.0);
+                // re-add it. We do so with a little randomness, so that the two
+                // guards won't be synchronized.
+                SetOneShotTimer("SparAttack", 0.5+Data.RandFlt0to1());
             }
         }
     }
