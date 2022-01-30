@@ -149,3 +149,38 @@ class WobbleDummyVisible extends SqRootScript
         OnWobbleFromFront();
     }
 }
+
+class Sparring extends SqRootScript
+{
+    function SparAttack(target) {
+        if (! Link.AnyExist("AITarget", self)) {
+            // An AITarget link can even force an AI to attack a friendly,
+            // as long as they're in combat mode. Thanks Firemage!
+            SetProperty("AI_Mode", eAIMode.kAIM_Combat);
+            Link.Create("AITarget", self, target);
+            print(Object_Description(self)+" attacking "+Object_Description(target));
+        } else {
+            print(Object_Description(self)+" AITarget link exists; not attacking.");
+        }
+    }
+
+    function OnSim() {
+        if (message().starting) {
+            SetOneShotTimer("SparAttack", 1.0);
+        }
+    }
+
+    function OnTimer() {
+        if (message().name=="SparAttack") {
+            local target = Link_GetOneParam("SparAttack", self);
+            if (target) {
+                SparAttack(target);
+                // Every two seconds, the AI will re-evaluate its targets. When
+                // that happens, it will see that its target is on the same team,
+                // and so not valid, and will remove it. So we need to repeatedly
+                // re-add it.
+                SetOneShotTimer("SparAttack", 1.0);
+            }
+        }
+    }
+}
