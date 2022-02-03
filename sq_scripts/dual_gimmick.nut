@@ -211,3 +211,36 @@ class Sparring extends SqRootScript
         }
     }
 }
+
+class HeatStimOnOff extends SqRootScript
+{
+    /* When receiving a Heat stim with intensity >= 50, send TurnOn via
+    all ControlDevice links; if < 50, send TurnOff. Will only send the
+    message when the presence of the stim changes. */
+    function OnSim() {
+        if (message().starting) {
+            SetData("HeatStimOn", 0);
+        }
+    }
+
+    function OnHeatStimStimulus() {
+        local wasOn = GetData("HeatStimOn");
+        local on;
+        // We add a tiny bit of hysteresis in here, to prevent the case
+        // where the stim value changes slightly (which happens with torches!)
+        if (wasOn) {
+            on = (message().intensity>=45);
+        } else {
+            on = (message().intensity>=55);
+        }
+        // And we use integers to ensure the == comparison works (because
+        // bools dont survive the GetData/SetData properly)
+        on = (on?1:0);
+        if (on != wasOn) {
+            print("HeatStimOnOff: "+on+ " (was "+wasOn+")");
+            SetData("HeatStimOn", on);
+            local msg = (on ? "TurnOn" : "TurnOff");
+            Link.BroadcastOnAllLinks(self, msg, "ControlDevice");
+        }
+    }
+}

@@ -328,7 +328,7 @@ class DoorStartsOpen extends SqRootScript
 
 class StartsOn extends SqRootScript
 {
-    // Put this on a n object to send it TurnOn when the mission starts.
+    // Put this on an object to send it TurnOn when the mission starts.
 
     function OnSim()
     {
@@ -337,7 +337,6 @@ class StartsOn extends SqRootScript
         }
     }
 }
-
 
 class StartsOff extends SqRootScript
 {
@@ -351,6 +350,33 @@ class StartsOff extends SqRootScript
     }
 }
 
+class TrapStartsOn extends SqRootScript
+{
+    // Put this on one of the stock Traps to send it TurnOn momentarily after
+    // the mission starts. 'StartsOn' doesnt work because StdTraps ignore TurnOn
+    // messages from themselves; but they _do_ accept "TurnOn" timer messages!
+    function OnSim()
+    {
+        if (message().starting) {
+            SetOneShotTimer("TurnOn", 0.01);
+        }
+    }
+
+}
+
+class TrapStartsOff extends SqRootScript
+{
+    // Put this on one of the stock Traps to send it TurnOff momentarily after
+    // the mission starts. 'StartsOff' doesnt work because StdTraps ignore TurnOn
+    // messages from themselves; but they _do_ accept "TurnOff" timer messages!
+    function OnSim()
+    {
+        if (message().starting) {
+            SetOneShotTimer("TurnOff", 0.01);
+        }
+    }
+
+}
 
 /* Sends itself TurnOff a few seconds after receiving TurnOn */
 class AutoTurnOff extends SqRootScript
@@ -457,5 +483,58 @@ class TrapFlipFlop extends SqRootScript
         SetData("LastSentOn", sending_on);
         local message = (sending_on ? "TurnOn" : "TurnOff");
         Link.BroadcastOnAllLinks(self, message, "ControlDevice");
+    }
+}
+
+class TrapToggleExistence extends SqRootScript
+{
+    /*
+    When receiving TurnOn, Teleport CD-linked objects to their initial
+    locations; when receiving TurnOff, teleport them to <0,0,0>.
+    Respects only the Invert flag of Trap Control Flags.
+
+    (OnSim, this spawns TeleportTraps to do the dirty work, and self-destructs)
+    */
+
+    function OnSim() {
+        if (message().starting) {
+            // Find all the targets first, so we dont have an active link
+            // query as we are creating more links, just in case.
+            local targets = [];
+            foreach (link in Link.GetAll("ControlDevice", self)) {
+                targets.append(LinkDest(link));
+            }
+            // Also find everyone who wants to control us, so we can make them
+            // control the teleport traps instead.
+            local controllers = [];
+            foreach (link in Link.GetAll("~ControlDevice", self)) {
+                controllers.append(LinkDest(link));
+            }
+            // Get our Trap Control Flags to pass on to our children.
+            local flags = 0;
+            if (HasProperty("TrapFlags")) {
+                flags = GetProperty("TrapFlags");
+            }
+            local invertedFlags = flags^TRAPF_INVERT;
+            // Now create two TeleportTraps for each object we control:
+            // one at its exact location, and one at the origin, and set them
+            // up instead of us.
+            foreach (target in targets) {
+                local targetTrap = Object.Create("TeleportTrap");
+                local originTrap = Object.Create("TeleportTrap");
+                Property.SetSimple(targetTrap, "TrapFlags", flags);
+                Property.SetSimple(originTrap, "TrapFlags", invertedFlags);
+                Object.Teleport(targetTrap, vector(), vector(), target);
+                Object.Teleport(originTrap, vector(), vector());
+                Link.Create("ControlDevice", targetTrap, target);
+                Link.Create("ControlDevice", originTrap, target);
+                foreach (controller in controllers) {
+                    Link.Create("ControlDevice", controller, targetTrap);
+                    Link.Create("ControlDevice", controller, originTrap);
+                }
+            }
+            // Finally, we can go away.
+            Object.Destroy(self);
+        }
     }
 }
