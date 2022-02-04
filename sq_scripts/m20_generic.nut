@@ -326,6 +326,19 @@ class DoorStartsOpen extends SqRootScript
 }
 
 
+class ContainerStartsOpen extends SqRootScript
+{
+    // Put this on a container to have it open when the mission starts.
+
+    function OnSim()
+    {
+        if (message().starting) {
+            ActReact.React("tweq_control",1.0,self,0,eTweqType.kTweqTypeJoints,eTweqDo.kTweqDoActivate);
+        }
+    }
+}
+
+
 class StartsOn extends SqRootScript
 {
     // Put this on an object to send it TurnOn when the mission starts.
