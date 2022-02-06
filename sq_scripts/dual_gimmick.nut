@@ -244,3 +244,25 @@ class HeatStimOnOff extends SqRootScript
         }
     }
 }
+
+class ToggleExtraLight extends SqRootScript
+{
+    function OnBeginScript() {
+        local amount = GetProperty("ExtraLight", "Amount (-1..1)");
+        local additive = GetProperty("ExtraLight", "Additive?");
+        SetData("TELAmount", amount);
+        SetData("TELAdditive", additive);
+    }
+
+    function OnTurnOn() {
+        local amount = GetData("TELAmount");
+        local additive = GetData("TELAdditive");
+        SetProperty("ExtraLight", "Amount (-1..1)", amount);
+        SetProperty("ExtraLight", "Additive?", additive);
+    }
+
+    function OnTurnOff() {
+        SetProperty("ExtraLight", "Amount (-1..1)", 0.0);
+        SetProperty("ExtraLight", "Additive?", true);
+    }
+}
