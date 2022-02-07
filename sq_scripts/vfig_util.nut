@@ -386,3 +386,35 @@ class CheckSquirrelScript extends SqRootScript
         }
     }
 }
+
+class EditorOnlyProcessDifficulty extends SqRootScript
+{
+    /*
+    Place this on a single object (NOT StartingPoint), and in its
+    Design Note parameters, set `Difficulty` to 0 (Normal), 1 (Hard),
+    or 2 (Expert). when game mode begins, the difficulty will be
+    processed accordingly.
+
+    When running in the actual game, this script will do nothing.
+    */
+
+    function OnSim() {
+        if (IsEditor()) {
+            local diff = -1;
+            if ("Difficulty" in userparams()) {
+                diff = userparams().Difficulty;
+            }
+            if (diff>=0 && diff<3) {
+                if (! Quest.Exists("difficulty")) {
+                    Quest.Set("difficulty", diff, eQuestDataType.kQuestDataMission);
+                }
+                DarkUI.TextMessage("Processing difficulty "+diff, 0x0000FF);
+                Debug.Command("process_difficulty");
+            } else {
+                DarkUI.TextMessage(
+                    "'Difficulty' param needs to be set to 0, 1, or 2 on "
+                    +Object_Description(self), 0x0000FF);
+            }
+        }
+    }
+}
