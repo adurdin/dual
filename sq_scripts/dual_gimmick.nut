@@ -266,3 +266,115 @@ class ToggleExtraLight extends SqRootScript
         SetProperty("ExtraLight", "Additive?", true);
     }
 }
+
+class BlinkController extends SqRootScript
+{
+    function OnSim() {
+        if (message().starting) {
+            SetData("BlinkTime", 0.0);
+            SetData("BlinkInterval", 0.0);
+            SetOneShotTimer("Blink", 1.0);
+        }
+    }
+
+    function OnTimer() {
+        if (message().name=="Blink") {
+            Blink();
+            SetOneShotTimer("Blink", 1.0);
+        }
+    }
+
+    DEBUG = false;
+
+    function Log(msg) {
+        if (DEBUG) DarkUI.TextMessage(msg, 0x0000FF, 800);
+    }
+
+    function Blink() {
+        // Don't blink more than once a minute or so.
+        local BLINK_INTERVAL = DEBUG? 2.0 : 60.0;
+        // And don't allow any painting to blink twice in five minutes.
+        local PAINTING_BLINK_INTERVAL = DEBUG? 10.0 : 5*60.0;
+
+        // Make sure we're not trying to make any blinking happen too often.
+        local now = GetTime();
+        local lastBlink = GetData("BlinkTime");
+        local interval = GetData("BlinkInterval");
+        if ((now - lastBlink) < interval) {
+            Log("Too soon (global)");
+            return;
+        }
+        interval = BLINK_INTERVAL*(0.9+0.6*Data.RandFlt0to1());
+        SetData("BlinkInterval", interval);
+
+        local player = ObjID("Player");
+        local playerPos = Object.Position(player);
+        local links = Link.GetAll("ControlDevice", self);
+        foreach (link in links) {
+            local o = LinkDest(link);
+            // Look for a good candidate:
+            // - must be on screen
+            //
+            // BUG: note that the periapt osm is currently interfering with
+            //      the visibility stuff, so the game thinks the painting is
+            //      always rendered :(
+            if (! Object.RenderedThisFrame(o)) {
+                Log("Not rendered :(");
+                continue;
+            }
+            // - must not be right up close
+            local dist = (playerPos - Object.Position(o)).Length();
+            if (dist <= 16.0) {
+                Log("Too close :(");
+                continue;
+            }
+            // - must be peripheral, not central
+            local dir = Camera.WorldToCamera(Object.Position(o)).GetNormalized();
+            local howCentered = dir.Dot(vector(1,0,0));
+            if (howCentered>=0.9) {
+                Log("Too central :(");
+                continue;
+            }
+            // - must not have blinked very recently
+            local prev = SendMessage(o, "LastBlinkTime?").tofloat();
+            if ((now - prev) < PAINTING_BLINK_INTERVAL) {
+                Log("Too soon :(");
+                continue;
+            }
+
+            // Seems like an okay candidate
+            SetData("BlinkTime", now);
+            SendMessage(o, "Blink");
+            break;
+        }
+    }
+}
+
+class Blink extends SqRootScript
+{
+    function OnSim() {
+        if (message().starting) {
+            local tex = GetProperty("OTxtRepr0");
+            SetData("BlinkOrig", tex);
+            SetData("BlinkTime", 0.0);
+        }
+    }
+
+    function OnLastBlinkTime_() {
+        local lastTime = GetData("BlinkTime");
+        Reply(lastTime);
+    }
+
+    function OnBlink() {
+        local now = GetTime();
+        SetData("BlinkTime", now);
+        SetProperty("OTxtRepr0", userparams().Blink);
+        SetOneShotTimer("BlinkOff", 0.06);
+    }
+
+    function OnTimer() {
+        if (message().name=="BlinkOff") {
+            SetProperty("OTxtRepr0", GetData("BlinkOrig"));
+        }
+    }
+}
