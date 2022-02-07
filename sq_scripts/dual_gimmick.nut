@@ -285,9 +285,10 @@ class BlinkController extends SqRootScript
     }
 
     DEBUG = false;
+    ALWAYS_BLINK = false;
 
     function Log(msg) {
-        if (DEBUG) DarkUI.TextMessage(msg, 0x0000FF, 800);
+        if (DEBUG) print(msg);
     }
 
     function Blink() {
@@ -309,43 +310,54 @@ class BlinkController extends SqRootScript
 
         local player = ObjID("Player");
         local playerPos = Object.Position(player);
+        playerPos.z = 0; // we only care about xy distance
         local links = Link.GetAll("ControlDevice", self);
+        local paintings = [];
         foreach (link in links) {
-            local o = LinkDest(link);
+            paintings.append(LinkDest(link));
+        }
+        foreach (o in paintings) {
             // Look for a good candidate:
             // - must be on screen
             //
             // BUG: note that the periapt osm is currently interfering with
             //      the visibility stuff, so the game thinks the painting is
             //      always rendered :(
-            if (! Object.RenderedThisFrame(o)) {
-                Log("Not rendered :(");
+            if (! Object.RenderedThisFrame(o) && !ALWAYS_BLINK) {
+                Log(Object_Description(o)+": Not rendered");
                 continue;
             }
             // - must not be right up close
-            local dist = (playerPos - Object.Position(o)).Length();
-            if (dist <= 16.0) {
-                Log("Too close :(");
+            local pos = Object.Position(o);
+            pos.z = 0; // we only care about xy distance
+            local dist = (playerPos - pos).Length();
+            if (dist <= 8.0 && !ALWAYS_BLINK) {
+                Log(Object_Description(o)+": Too close");
                 continue;
             }
-            // - must be peripheral, not central
-            local dir = Camera.WorldToCamera(Object.Position(o)).GetNormalized();
-            local howCentered = dir.Dot(vector(1,0,0));
-            if (howCentered>=0.9) {
-                Log("Too central :(");
-                continue;
+            // - must be peripheral, not central (unless far away)
+            if (dist <= 16.0) {
+                local dir = Camera.WorldToCamera(Object.Position(o)).GetNormalized();
+                local howCentered = dir.Dot(vector(1,0,0));
+                if (howCentered >= 0.9 && !ALWAYS_BLINK) {
+                    Log(Object_Description(o)+": Too central");
+                    continue;
+                }
             }
             // - must not have blinked very recently
             local prev = SendMessage(o, "LastBlinkTime?").tofloat();
-            if ((now - prev) < PAINTING_BLINK_INTERVAL) {
-                Log("Too soon :(");
+            if ((now - prev) < PAINTING_BLINK_INTERVAL && !ALWAYS_BLINK) {
+                Log(Object_Description(o)+": Too soon");
                 continue;
             }
 
             // Seems like an okay candidate
+            Log(Object_Description(o)+": Blink!");
             SetData("BlinkTime", now);
             SendMessage(o, "Blink");
-            break;
+            
+            if (!ALWAYS_BLINK)
+                break;
         }
     }
 }
@@ -369,7 +381,7 @@ class Blink extends SqRootScript
         local now = GetTime();
         SetData("BlinkTime", now);
         SetProperty("OTxtRepr0", userparams().Blink);
-        SetOneShotTimer("BlinkOff", 0.06);
+        SetOneShotTimer("BlinkOff", 0.08);
     }
 
     function OnTimer() {
