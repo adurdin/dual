@@ -287,15 +287,15 @@ class BlinkController extends SqRootScript
     DEBUG = false;
     ALWAYS_BLINK = false;
 
-    function Log(msg) {
-        if (DEBUG) print(msg);
-    }
-
     function Blink() {
+        local Log = (DEBUG?
+            function(msg) { print(msg); }
+            : function(msg) {} );
+
         // Don't blink more than once a minute or so.
         local BLINK_INTERVAL = DEBUG? 2.0 : 60.0;
         // And don't allow any painting to blink twice in five minutes.
-        local PAINTING_BLINK_INTERVAL = DEBUG? 10.0 : 5*60.0;
+        local PAINTING_BLINK_INTERVAL = DEBUG? 6.0 : 5*60.0;
 
         // Make sure we're not trying to make any blinking happen too often.
         local now = GetTime();
@@ -303,14 +303,13 @@ class BlinkController extends SqRootScript
         local interval = GetData("BlinkInterval");
         if ((now - lastBlink) < interval) {
             Log("Too soon (global)");
-            return;
+            if (! ALWAYS_BLINK)
+                return;
         }
         interval = BLINK_INTERVAL*(0.9+0.6*Data.RandFlt0to1());
         SetData("BlinkInterval", interval);
 
-        local player = ObjID("Player");
-        local playerPos = Object.Position(player);
-        playerPos.z = 0; // we only care about xy distance
+        local cameraPos = Camera.GetPosition();
         local links = Link.GetAll("ControlDevice", self);
         local paintings = [];
         foreach (link in links) {
@@ -323,32 +322,44 @@ class BlinkController extends SqRootScript
             // BUG: note that the periapt osm is currently interfering with
             //      the visibility stuff, so the game thinks the painting is
             //      always rendered :(
-            if (! Object.RenderedThisFrame(o) && !ALWAYS_BLINK) {
+            if (! Object.RenderedThisFrame(o)) {
                 Log(Object_Description(o)+": Not rendered");
-                continue;
+                if (! ALWAYS_BLINK)
+                    continue;
             }
-            // - must not be right up close
+            // - must not be right up close (in XY)
             local pos = Object.Position(o);
-            pos.z = 0; // we only care about xy distance
-            local dist = (playerPos - pos).Length();
-            if (dist <= 8.0 && !ALWAYS_BLINK) {
+            local dist = (pos - cameraPos).Length();
+            if (dist <= 8.0) {
                 Log(Object_Description(o)+": Too close");
-                continue;
+                if (! ALWAYS_BLINK)
+                    continue;
             }
             // - must be peripheral, not central (unless far away)
             if (dist <= 16.0) {
                 local dir = Camera.WorldToCamera(Object.Position(o)).GetNormalized();
                 local howCentered = dir.Dot(vector(1,0,0));
-                if (howCentered >= 0.9 && !ALWAYS_BLINK) {
+                if (howCentered >= 0.9) {
                     Log(Object_Description(o)+": Too central");
-                    continue;
+                    if (! ALWAYS_BLINK)
+                        continue;
                 }
             }
             // - must not have blinked very recently
             local prev = SendMessage(o, "LastBlinkTime?").tofloat();
-            if ((now - prev) < PAINTING_BLINK_INTERVAL && !ALWAYS_BLINK) {
+            if ((now - prev) < PAINTING_BLINK_INTERVAL) {
                 Log(Object_Description(o)+": Too soon");
-                continue;
+                if (! ALWAYS_BLINK)
+                    continue;
+            }
+            // - and must not have terrain in front of it
+            local hitPos = vector();
+            local hit = Engine.PortalRaycast(cameraPos, pos, hitPos);
+            local hitDist = (hitPos - cameraPos).Length();
+            if (hitDist < dist) {
+                Log(Object_Description(o)+": Obscured");
+                if (! ALWAYS_BLINK)
+                    continue;
             }
 
             // Seems like an okay candidate
@@ -356,7 +367,7 @@ class BlinkController extends SqRootScript
             SetData("BlinkTime", now);
             SendMessage(o, "Blink");
             
-            if (!ALWAYS_BLINK)
+            if (! ALWAYS_BLINK)
                 break;
         }
     }
