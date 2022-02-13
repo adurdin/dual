@@ -1,6 +1,14 @@
 
 torso  Burrick
 
+// motion MOTIONNAME <flags> <blend_time>
+// flags can be a combination of:
+//      1 - neck is fixed (some hack for bad mocap data handling)
+//      2 - is turning motion
+//      4 - ignore translation
+//      8 - is locomotion (can also come from archetype, maybe?)
+// blend time is in ms.
+
 schema Test 0
 MType  GroundAction
 TimeScale 0
@@ -21,6 +29,13 @@ TimeScale 0
 XYZScale  0
 motion BK111012     0  150
 motion BK111011     0  150
+
+// Hop forward (walking)
+schema Locomote 0, Hopping 0
+MType  GroundAction
+TimeScale 0
+XYZScale  0
+motion bbk213256s    0  500
 
 schema Stand 0, Wheel 0
 MType  StandWith90s
@@ -259,6 +274,14 @@ TimeScale 0
 XYZScale  0
 motion Burrsway     4  500
 
+// Roll (for if we want this action, specifically)
+schema Stand 0, Foo 0
+MType  GroundAction
+TimeScale 0
+XYZScale  0
+motion bbkroll      0  500
+
+// Normal idles
 schema IdleGesture 0
 MType  GroundAction
 TimeScale 0
@@ -266,3 +289,55 @@ XYZScale  0
 motion BK111001     4  500
 motion BK111002     4  500
 motion BK111000     4  500
+
+// Baby idles (much more variety!)
+schema IdleGesture 0, Baby 0
+MType  GroundAction
+TimeScale 0
+XYZScale  0
+motion bbkroll      0  500      // Roll
+motion bbk21326a    0  500      // Hop to the right
+motion bbk213265    0  500      // Hop to the left
+motion BK111037     0  500      // Stand, shake neck and back a little
+motion BK111212     2  500      // Turn to left
+motion BK111213     2  500      // Turn to right
+motion BK113100     4  500      // Stand and wiggle slightly
+motion BK113101     4  500      // Stand and wiggle slightly
+motion BK113510     0  500      // Stand and big wiggle
+motion BK113602     0  500      // Stand and rotate neck in circle
+motion BK113650     0  500      // Stand and tilt head
+motion BK113651     0  500      // Stand and shake hear around
+motion BK114300     0  500      // Raise head in air
+motion BK114350     0  500      // Raise head high in air
+
+// Hop to the left (fighting)
+schema Locomote 0, Hopping 0, MeleeCombat 0, Direction 1
+MType  GroundAction
+TimeScale 0
+XYZScale  0
+motion bbk213265     0  500
+
+// Hop to the right (fighting)
+schema Locomote 0, Hopping 0, MeleeCombat 0, Direction 2
+MType  GroundAction
+TimeScale 0
+XYZScale  0
+motion bbk21326a     0  500
+
+// Hop forward (fighting)
+schema Hopping 0, Locomote 0, MeleeCombat 0, Direction 3
+MType  GroundAction
+TimeScale 0
+XYZScale  0
+motion bbk213256     0  500
+//motion BH213300     0  500
+//motion BH213301     0  500
+
+// Hop backwards (fighting)
+schema Hopping 0, Locomote 0, MeleeCombat 0, Direction 4
+MType  GroundAction
+TimeScale 0
+XYZScale  2.9
+motion bbk213250     0  500
+//motion BH213251     0  500
+//motion BH213263     0  500
