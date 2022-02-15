@@ -401,3 +401,25 @@ class Blink extends SqRootScript
         }
     }
 }
+
+class DelayedFall extends SqRootScript
+{
+    function OnTurnOn() {
+        if (! Locked.IsLocked(self)) {
+            local delay = 1000;
+            if (HasProperty("ScriptTiming")) {
+                delay = GetProperty("ScriptTiming");
+            }
+            SetProperty("Locked", true);
+            SetOneShotTimer("DelayedFall", delay/1000.0);
+        }
+    }
+
+    function OnTimer() {
+        if (message().name == "DelayedFall") {
+            local controls = GetProperty("PhysControl", "Controls Active");
+            controls = controls & (~24); // Clear location (8) and rotation (16).
+            SetProperty("PhysControl", "Controls Active", controls);
+        }
+    }
+}

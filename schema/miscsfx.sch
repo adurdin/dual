@@ -462,6 +462,12 @@ schema buzzer_error
 archetype DEVICE_MISC
 buzzer
 
+//Gantry brake lever
+schema lvgantry_on
+archetype DEVICE_SWITCH
+LvFloor1
+env_tag (Event Activate) (SwitchType LvGantry)
+
 //////////
 //ALARMS//
 //////////

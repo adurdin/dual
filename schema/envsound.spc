@@ -52,9 +52,9 @@ tag DeviceType GenPotion TimedPotion HolyH20 BlueLight CauldLvr MoldLvr CrunchyF
 
 tag AlarmType Gong BellSm RmzAlarm DinnerBell Alarm MechRedAlarm MechTowerAlarm FlickerLight
 
-tag ElevType Elev1Plat Elev2Hmr Elev3WHdoor TubeLift SkyLight LightHseFloor DumbWaiter MovingTarget
+tag ElevType Elev1Plat Elev2Hmr Elev3WHdoor TubeLift SkyLight LightHseFloor DumbWaiter MovingTarget ElevGantry
 
-tag SwitchType BPush BPull BElev BRmz BBook LvWall LvThrow LvFloor1 LvFloor2 LvSlide LvPanel PPlate LvScope LvRotate LvMechAnt BNumber BVicLight LvShipWheel
+tag SwitchType BPush BPull BElev BRmz BBook LvWall LvThrow LvFloor1 LvFloor2 LvSlide LvPanel PPlate LvScope LvRotate LvMechAnt BNumber BVicLight LvShipWheel LvGantry
 
 //CHECK & DELETE IF NOT USED
 tag MachType SwingArmPump Turbine Gear1 Gear2 GWheel Harp Toilet
