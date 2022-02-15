@@ -1169,12 +1169,12 @@ archetype DEVICE_LIFT
 no_repeat
 mono_loop 0 0
 volume -800
-elev3go
-env tag (Event ActiveLoop) (ElevType ElevGantry)
+cauldron
+env_tag (Event ActiveLoop) (ElevType ElevGantry)
 
 schema elgantry_stop
 archetype DEVICE_LIFT
 no_repeat
 volume -800
-elev3st
-env tag (Event Deactivate) (ElevType ElevGantry)
+d_slid3c
+env_tag (Event Deactivate) (ElevType ElevGantry)
