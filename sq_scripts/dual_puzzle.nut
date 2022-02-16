@@ -108,3 +108,47 @@ class LibraryPuzzle extends SqRootScript
         SetData("LibraryPuzzleProgress", progress);
     }
 }
+
+class GantryPuzzle extends SqRootScript
+{
+    function OnSim() {
+        // We need to be sure to kick this off only after the existence traps
+        // have done their Sim stuff. I don't know if Sim messages happen
+        // in any particular order, so let's just be cautious:
+        PostMessage(self, "Setup");
+    }
+
+    function OnSetup() {
+        ActivateScenario(0);
+    }
+
+    function ActivateScenario(n) {
+        local relayRubble = ObjID("RubbleGantryScenario");
+        local relayMiddle = ObjID("MiddleGantryScenario");
+        local relayWindow = ObjID("WindowGantryScenario");
+        if (n==0) {
+            SendMessage(relayRubble, "TurnOn");
+            SendMessage(relayMiddle, "TurnOff");
+            SendMessage(relayWindow, "TurnOff");
+        } else if (n==1) {
+            SendMessage(relayRubble, "TurnOff");
+            SendMessage(relayMiddle, "TurnOn");
+            SendMessage(relayWindow, "TurnOff");
+        } else {
+            SendMessage(relayRubble, "TurnOff");
+            SendMessage(relayMiddle, "TurnOff");
+            SendMessage(relayWindow, "TurnOn");
+        }
+    }
+
+    function OnMovingTerrainWaypoint() {
+        local pt = message().waypoint;
+        if (pt==ObjID("TerrPtGantry1")) {
+            ActivateScenario(0);
+        } else if (pt==ObjID("TerrPtGantry2") || pt==ObjID("TerrPtGantry4")) {
+            ActivateScenario(1);
+        } else {
+            ActivateScenario(2);
+        }
+    }
+}
