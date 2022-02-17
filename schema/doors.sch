@@ -148,6 +148,17 @@ d_met1c
 env_tag (Event StateChange) (DoorType Metal) (OpenState Closed) (OldOpenState Opening Closing) (CreatureType Player)
 
 
+//METAL DOOR 1a - Squeaking (non-latching) Metal Door
+
+//METAL DOOR 1a -PLYR SQUEAKS  <--Yes, I know it's the wood squeak!
+schema doormet1a_sq_p
+archetype PLYR_DOOR
+volume -2000
+no_repeat
+d_mets2 d_mets4 d_mets5
+env_tag (Event StateChange) (DoorType MetalSqueak) (OpenState Opening Closing) (OldOpenState Open Opening Closing Closed) (CreatureType Player)
+
+
 //METAL DOOR 2 -Heavy Metal Door [like sewer hatch]
 
 //METAL DOOR 2 -PLYR OPENING & CLOSING
