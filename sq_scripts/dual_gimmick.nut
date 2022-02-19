@@ -423,3 +423,36 @@ class DelayedFall extends SqRootScript
         }
     }
 }
+
+class HangingHazard extends SqRootScript
+{
+    function OnBeginScript() {
+        Physics.SubscribeMsg(self, ePhysScriptMsgType.kCollisionMsg);
+    }
+
+    function OnEndScript() {
+        Physics.UnsubscribeMsg(self, ePhysScriptMsgType.kCollisionMsg);
+    }
+
+    function OnPhysCollision() {
+        if (message().collType == ePhysCollisionType.kCollObject
+        && message().collObj == ObjID("Player")) {
+            local coll = "Event Collision";
+            local mat1 = "Metal";
+            local mat2 = "Wood";
+            if (HasProperty("Material Tags")) {
+                mat2 = GetProperty("Material Tags", "1: Tags");
+                if (startswith(mat2, "Material ")) {
+                    mat2 = mat2.slice(9);
+                }
+            }
+            local tags = (coll+", Material "+mat1+", Material2 "+mat2);
+            local ok = Sound.PlayEnvSchema(0, tags, self, message().collObj, eEnvSoundLoc.kEnvSoundOnObj);
+            if (! ok) {
+                tags = (coll+", Material "+mat2+", Material2 "+mat1);
+                ok = Sound.PlayEnvSchema(0, tags, self, message().collObj, eEnvSoundLoc.kEnvSoundOnObj);
+            }
+            print("tags: "+tags+" ok: "+ok);
+        }
+    }
+}
