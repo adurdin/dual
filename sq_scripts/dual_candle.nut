@@ -78,9 +78,21 @@ class AnimLightExtra extends SqRootScript {
             ChangeMode(true);
         }
     }
-    
+
     function OnSlain() {
         ChangeMode(false);
+    }
+
+    function OnWaterStimStimulus() {
+        ChangeMode(false);
+    }
+
+    function OnKOGasStimulus() {
+        ChangeMode(false);
+    }
+
+    function OnFireStimStimulus() {
+        ChangeMode(true);
     }
 
     function ChangeMode(on) {
