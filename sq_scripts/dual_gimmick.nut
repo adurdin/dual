@@ -456,3 +456,13 @@ class HangingHazard extends SqRootScript
         }
     }
 }
+
+class CivicWindowTextureTrap extends SqRootScript {
+    function OnTurnOn() {
+        Property.SetSimple(self, "OTxtRepr1", "obj/txt16/civicwin02l");
+    }
+
+    function OnTurnOff() {
+        Property.SetSimple(self, "OTxtRepr1", "obj/txt16/civicwin02");
+    }
+}
