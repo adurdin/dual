@@ -85,7 +85,6 @@ class AnimLightExtra extends SqRootScript {
 
     function ChangeMode(on) {
         // Override this method in inherited classes.
-        print("****** AnimLightExtra: ChangeMode("+on+") ******");
     }
 }
 
