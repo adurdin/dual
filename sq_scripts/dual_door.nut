@@ -1,3 +1,17 @@
+/* Put this on a door to make it send TurnOn/TurnOff along ControlDevice joint tweqs run as the door is opening
+   links as it starts opening/closing.
+*/
+class DoorOpeningClosingSwitch extends SqRootScript
+{
+    function OnDoorOpening() {
+        Link.BroadcastOnAllLinks(self, "TurnOn", "ControlDevice");
+    }
+
+    function OnDoorClosing() {
+        Link.BroadcastOnAllLinks(self, "TurnOff", "ControlDevice");
+    }
+}
+
 /* Put this on a door to make its joint tweqs run as the door is opening
    and closing.
    (The stock SubDoorJoints script runs tweqs on opening and *closed*.
