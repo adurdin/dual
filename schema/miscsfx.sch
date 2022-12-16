@@ -651,6 +651,20 @@ volume -800
 harp1 harp2 harp3
 env_tag (Event Activate) (MachType Harp)
 
+//PLAY FLUTE
+schema play_flute
+archetype DEVICE_MISC
+volume -800
+brdcall1 brdcall2 brdcall3
+env_tag (Event Activate) (MachType Flute)
+
+//STRUM LUTE
+schema strum_lute
+archetype DEVICE_MISC
+volume -800
+waxytune
+env_tag (Event Activate) (MachType Lute)
+
 //MAGE STATUES
 //schema statue_mgearth
 //archetype DEVICE_MISC

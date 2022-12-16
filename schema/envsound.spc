@@ -57,7 +57,7 @@ tag ElevType Elev1Plat Elev2Hmr Elev3WHdoor TubeLift SkyLight LightHseFloor Dumb
 tag SwitchType BPush BPull BElev BRmz BBook LvWall LvThrow LvFloor1 LvFloor2 LvSlide LvPanel PPlate LvScope LvRotate LvMechAnt BNumber BVicLight LvShipWheel LvGantry
 
 //CHECK & DELETE IF NOT USED
-tag MachType SwingArmPump Turbine Gear1 Gear2 GWheel Harp Toilet
+tag MachType SwingArmPump Turbine Gear1 Gear2 GWheel Harp Flute Lute Toilet
 
 //CHECK & DELETE IF NOT USED
 tag WardType AirWard FireWard EarthWard WaterWard StatueMgE StatueMgA StatueMgW StatueMgF 
