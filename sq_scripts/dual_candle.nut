@@ -109,3 +109,21 @@ class CandleGlow extends AnimLightExtra {
         Property.Set(self, "ExtraLight", "Additive?", true);
     }
 }
+
+class LootAnimLight extends SqRootScript {
+    // Prevent AnimLight from remaining when picking up this object,
+    // by slightly delaying the pickup. The AnimLight ought to have
+    // a very quick "msec to dim"
+    function OnFrobWorldEnd() {
+        Object.AddMetaProperty(self, "FrobInert");
+        SendMessage(self, "TurnOff");
+        SetOneShotTimer("ReallyLootMe", 0.07);
+        Reply(false);
+    }
+
+    function OnTimer() {
+        if (message().name=="ReallyLootMe") {
+            Container.Add(self, ObjID("Player")); //, int type = 0, int flags = CTF_COMBINE);
+        }
+    }
+}
