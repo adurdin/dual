@@ -7,3 +7,6 @@ Tombs (keep??)
 East Wing
 10      100     n/a         Laboratory hallway
 10      101     ??          Guest suite
+
+West Wing
+100     80      n/a         Greenhouse shed
