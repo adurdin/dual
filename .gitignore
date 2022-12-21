@@ -5,3 +5,8 @@
 startmis.sav
 temp.mis
 temp.gam
+query_results.txt
+
+# Prevent Dark Object Viewer from crashing/being slow when browsing
+# this folder; ensure it finds this .png *before* it finds any .mis!
+/aaaa.png
