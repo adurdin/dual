@@ -1,0 +1,54 @@
+; (for use with merge.bat)
+;
+; This script requires area brushes as ids 1, 2, 3.
+; If you dont have the mission set up right, who knows what this will do?
+;
+; Set mergeoptim=1 to optimize (instead of only portalize)
+; Set mergelighting=0/1/2 for quick/raycast/objcast lighting
+
+eval mergename mprint Merging %s.mis, please wait...
+eval mergename load_file %s.mis
+hots_filter 1
+
+set_lighting_mode 0
+ifdef mergelighting eval mergelighting set_lighting_mode %s
+
+brush_select 1
+hots_state 0
+hots_state -1
+compress_br_ids
+clear_surface_cache
+ifndef mergeoptim portalize
+ifdef mergeoptim optimize
+brush_select 1
+hots_state -1
+hots_state 0
+eval mergename save_mission _slice1.mis
+
+brush_select 2
+hots_state 0
+hots_state -1
+compress_br_ids
+clear_surface_cache
+ifndef mergeoptim portalize
+ifdef mergeoptim optimize
+brush_select 2
+hots_state -1
+hots_state 0
+eval mergename save_mission _slice2.mis
+
+brush_select 3
+hots_state 0
+hots_state -1
+compress_br_ids
+clear_surface_cache
+ifndef mergeoptim portalize
+ifdef mergeoptim optimize
+brush_select 3
+hots_state -1
+hots_state 0
+eval mergename save_mission _slice3.mis
+
+play_schema dinner_bell
+eval mergename mprint Merging complete.
+quit_game
