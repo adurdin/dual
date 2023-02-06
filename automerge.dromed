@@ -20,10 +20,10 @@ compress_br_ids
 clear_surface_cache
 ifndef mergeoptim portalize
 ifdef mergeoptim optimize
-brush_select 1
-hots_state -1
-hots_state 0
-eval mergename save_mission _slice1.mis
+;brush_select 1
+;hots_state -1
+;hots_state 0
+save_mission _slice1.mis
 
 brush_select 2
 hots_state 0
@@ -32,10 +32,10 @@ compress_br_ids
 clear_surface_cache
 ifndef mergeoptim portalize
 ifdef mergeoptim optimize
-brush_select 2
-hots_state -1
-hots_state 0
-eval mergename save_mission _slice2.mis
+;brush_select 2
+;hots_state -1
+;hots_state 0
+save_mission _slice2.mis
 
 brush_select 3
 hots_state 0
@@ -44,10 +44,10 @@ compress_br_ids
 clear_surface_cache
 ifndef mergeoptim portalize
 ifdef mergeoptim optimize
-brush_select 3
-hots_state -1
-hots_state 0
-eval mergename save_mission _slice3.mis
+;brush_select 3
+;hots_state -1
+;hots_state 0
+save_mission _slice3.mis
 
 play_schema dinner_bell
 eval mergename mprint Merging complete.
