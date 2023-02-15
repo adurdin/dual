@@ -56,7 +56,7 @@ if not exist %FMDIR%\_slice3.mis goto badmerge
 
 echo time to merge %FMDIR%\_slice1.mis %FMDIR%\_slice2.mis etc...
 
-misdeed merge _slice1.mis _slice2.mis 0 0 1 416 -o _combined1.mis
+misdeed merge _slice1.mis _slice2.mis 0 0 1 -416 -o _combined1.mis
 if not exist %FMDIR%\_combined1.mis goto badmerge
 misdeed merge _combined1.mis _slice3.mis 0 0 1 96 -o _combined2.mis
 if not exist %FMDIR%\_combined2.mis goto badmerge
