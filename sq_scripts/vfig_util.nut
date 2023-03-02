@@ -418,3 +418,20 @@ class EditorOnlyProcessDifficulty extends SqRootScript
         }
     }
 }
+
+/* Put this on an object (i.e. the player/StartingPoint) to
+spew on screen the name of each concrete room as they enter it. */
+class DebugRoomSpew extends SqRootScript {
+    function OnObjRoomTransit() {
+        local fromRoom = message().FromObjId;
+        local toRoom = message().ToObjId;
+        local s;
+        if (toRoom) {
+            s = "Room: "+Object_Description(toRoom);
+        } else {
+            s = "Room: [not in a room]";
+        }
+        print(s);
+        DarkUI.TextMessage(s, 0xb40ef1, 2000.0);
+    }
+}
