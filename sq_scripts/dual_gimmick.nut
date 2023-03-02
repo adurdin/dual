@@ -456,3 +456,84 @@ class HangingHazard extends SqRootScript
         }
     }
 }
+
+/*
+class HurtMeBaby extends SqRootScript {
+    function OnBeginScript() {
+        Physics.SubscribeMsg(self, ePhysScriptMsgType.kCollisionMsg);
+    }
+
+    function OnEndScript() {
+        Physics.UnsubscribeMsg(self, ePhysScriptMsgType.kCollisionMsg);
+    }
+
+    // function OnPhysContactCreate() {
+    //     print(self+": contact type "+message().contactType+" with "+message().contactObj+" submod "+message().contactSubmod);
+    // }
+
+    function OnPhysCollision() {
+        if (message().collType==ePhysCollisionType.kCollObject) {
+            local mauler = message().collObj;
+            //print(self+": collision from "+mauler+" submod "+message().collSubmod);
+            // TODO - maybe not just burricks?
+            if (Object.InheritsFrom(mauler, "Burrick")) {
+                if (! Link.AnyExist("AIAttack", mauler, self))
+                    SendMessage(mauler, "HurtMeBaby");
+            }
+        }
+        // class sPhysMsg extends sScrMsg
+        // {
+        //    const int Submod;
+        //    const ePhysCollisionType collType;
+        //    const ObjID collObj;
+        //    const int collSubmod;
+        //    const float collMomentum;
+        //    const vector collNormal;
+        //    const vector collPt;
+        //    const ePhysContactType contactType;
+        //    const ObjID contactObj;
+        //    const int contactSubmod;
+        //    const ObjID transObj;
+        //    const int transSubmod;
+        // }
+    }
+}
+
+class MeleeObstacles extends SqRootScript {
+    function OnHurtMeBaby() {
+        local target = message().from;
+        // local link = Link.GetOne("AIAttack", self, target);
+        // if (link!=0) {
+        //     print("already attacking you (shouldnt get here, but just in case).");
+        //     return;
+        // }
+        // print("Creating Attack link!");
+        // target = message().from;
+        // link = Link.Create("AIAttack", self, target);
+        // LinkTools.LinkSetData(link, "", 5); // Very High
+
+        local link = Link.GetOne("AITarget", self);
+        if (link!=0) {
+            if (LinkDest(link)==target) {
+                //print("already attacking you (shouldnt get here, but just in case).");
+                return;
+            }
+            Link.Destroy(link);
+        }
+        SetProperty("AI_Mode", eAIMode.kAIM_Combat);
+        Link.Create("AITarget", self, target);
+        local metaprop = Object.Named("M-MeleeBurrick");
+        if (metaprop) {
+            if (! Object.HasMetaProperty(self, metaprop)) {
+                print("Adopting melee weapons!");
+                Object.AddMetaProperty(self, metaprop);
+            }
+            // TODO: need to remove the metaprop after destroying the object!
+        }
+    }
+
+    function OnMessage() {
+        print(self+": uncategorized "+message().message);
+    }
+}
+*/
