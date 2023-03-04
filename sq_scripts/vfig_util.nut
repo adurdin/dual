@@ -423,15 +423,85 @@ class EditorOnlyProcessDifficulty extends SqRootScript
 spew on screen the name of each concrete room as they enter it. */
 class DebugRoomSpew extends SqRootScript {
     function OnObjRoomTransit() {
-        local fromRoom = message().FromObjId;
-        local toRoom = message().ToObjId;
-        local s;
-        if (toRoom) {
-            s = "Room: "+Object_Description(toRoom);
-        } else {
-            s = "Room: [not in a room]";
+        if (IsEditor()) {
+            local fromRoom = message().FromObjId;
+            local toRoom = message().ToObjId;
+            local s;
+            if (toRoom) {
+                s = "Room: "+Object_Description(toRoom);
+            } else {
+                s = "[not in a room]";
+                Sound.PlayAmbient(self, "belldinn");
+            }
+            print(s);
+            DarkUI.TextMessage(s, 0xb40ef1, 2000.0);
         }
-        print(s);
-        DarkUI.TextMessage(s, 0xb40ef1, 2000.0);
+    }
+}
+
+/* Put this on an EditorOnly object that the player can throw
+somewhere to make sounds. */
+class DebugSoundMaker extends SqRootScript {
+    function EnableMakingSounds(enabled) {
+        local schema = "sg1a1h";
+        local isMakingSounds = false;
+        if (IsDataSet("IsMakingSounds")) {
+            isMakingSounds = GetData("IsMakingSounds");
+        }
+        if (! isMakingSounds && enabled) {
+            // Start:
+            Sound.PlaySchemaAtObject(self, schema, self);
+            SetData("IsMakingSounds", true);
+        } else if (isMakingSounds && ! enabled) {
+            // Stop:
+            Sound.HaltSchema(self);
+            SetData("IsMakingSounds", false);
+        }
+    }
+
+    function EnableTimer(enabled) {
+        local timer = 0;
+        if (IsDataSet("RepeatTimer")) {
+            timer = GetData("RepeatTimer");
+        }
+        if (! timer && enabled) {
+            // Start:
+            timer = SetOneShotTimer("MakeASound", 1.0);
+            SetData("RepeatTimer", timer);
+        } else if (timer && ! enabled) {
+            // Stop:
+            KillTimer(timer);
+            ClearData("RepeatTimer");
+        }
+    }
+
+    function OnTimer() {
+        if (message().name=="MakeASound") {
+            EnableMakingSounds(false);
+            EnableMakingSounds(true);
+            local timer = SetOneShotTimer("MakeASound", 1.0);
+            SetData("RepeatTimer", timer);
+        }
+    }
+
+    function OnBeginScript() {
+        local types = (ePhysScriptMsgType.kMadePhysMsg
+            | ePhysScriptMsgType.kMadeNonPhysMsg);
+        Physics.SubscribeMsg(self, types);
+    }
+
+    function OnEndScript() {
+        local types = (ePhysScriptMsgType.kMadePhysMsg
+            | ePhysScriptMsgType.kMadeNonPhysMsg);
+        Physics.UnsubscribeMsg(self, types);
+    }
+
+    function OnPhysMadePhysical() {
+        EnableTimer(true);
+    }
+
+    function OnPhysMadeNonPhysical() {
+        EnableTimer(false);
+        EnableMakingSounds(false);
     }
 }
