@@ -457,6 +457,24 @@ class HangingHazard extends SqRootScript
     }
 }
 
+class TrampleBook extends SqRootScript {
+    function OnTweqComplete() {
+        if (message().Type==eTweqType.kTweqTypeModels
+        && message().Op==eTweqOperation.kTweqOpHaltTweq) {
+            if (! IsDataSet("Trampled")) {
+                SetData("Trampled", true);
+                local qvar = "bookstrampled";
+                local count = 0;
+                if (Quest.Exists(qvar)) {
+                    count = Quest.Get(qvar);
+                }
+                count += 1;
+                Quest.Set(qvar, count);
+            }
+        }
+    }
+}
+
 /*
 class HurtMeBaby extends SqRootScript {
     function OnBeginScript() {
