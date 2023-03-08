@@ -110,20 +110,33 @@ class CandleGlow extends AnimLightExtra {
     }
 }
 
-class LootAnimLight extends SqRootScript {
-    // Prevent AnimLight from remaining when picking up this object,
-    // by slightly delaying the pickup. The AnimLight ought to have
-    // a very quick "msec to dim"
+class FrobTransmute extends SqRootScript {
+    // If we (or our archetypes) have a Transmute link to another
+    // object or archetype, move or clone it into our position;
+    // then slay ourself.
+    //
+    // Prime use case is lootable candles with AnimLights; because
+    // you cannot safely Destroy an AnimLight, we transmute a frobbable
+    // but not lootable candle into a lootable one.
+    //
     function OnFrobWorldEnd() {
-        Object.AddMetaProperty(self, "FrobInert");
-        SendMessage(self, "TurnOff");
-        SetOneShotTimer("ReallyLootMe", 0.07);
-        Reply(false);
-    }
-
-    function OnTimer() {
-        if (message().name=="ReallyLootMe") {
-            Container.Add(self, ObjID("Player")); //, int type = 0, int flags = CTF_COMBINE);
+        local links = Link.GetAllInheritedSingle("Transmute", self);
+        if (links.AnyLinksLeft()) {
+            local link = links.Link();
+            local obj = LinkDest(link);
+            if (obj<0) {
+                obj = Object.Create(obj);
+            }
+            Object.Teleport(obj, vector(), vector(), self);
+            SendMessage(self, "Transmuted", obj);
+            Damage.Slay(self, 0);
         }
+    }
+}
+
+class FrobTransmuteAndLoot extends FrobTransmute {
+    function OnTransmuted() {
+        local obj = message().data;
+        Container.Add(obj, "Player");
     }
 }
