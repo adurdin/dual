@@ -271,105 +271,38 @@ class BlinkController extends SqRootScript
 {
     function OnSim() {
         if (message().starting) {
-            SetData("BlinkTime", 0.0);
-            SetData("BlinkInterval", 0.0);
-            SetOneShotTimer("Blink", 1.0);
+            SetOneShotTimer("Blink", 10.0);
         }
     }
 
     function OnTimer() {
         if (message().name=="Blink") {
             Blink();
-            SetOneShotTimer("Blink", 1.0);
+            SetOneShotTimer("Blink", 10.0);
         }
     }
 
-    DEBUG = false;
-    ALWAYS_BLINK = false;
-
     function Blink() {
-        local Log = (DEBUG?
-            function(msg) { print(msg); }
-            : function(msg) {} );
-
-        // Don't blink more than once a minute or so.
-        local BLINK_INTERVAL = DEBUG? 2.0 : 60.0;
-        // And don't allow any painting to blink twice in five minutes.
-        local PAINTING_BLINK_INTERVAL = DEBUG? 6.0 : 5*60.0;
-
-        // Make sure we're not trying to make any blinking happen too often.
-        local now = GetTime();
-        local lastBlink = GetData("BlinkTime");
-        local interval = GetData("BlinkInterval");
-        if ((now - lastBlink) < interval) {
-            Log("Too soon (global)");
-            if (! ALWAYS_BLINK)
-                return;
-        }
-        interval = BLINK_INTERVAL*(0.9+0.6*Data.RandFlt0to1());
-        SetData("BlinkInterval", interval);
-
-        local cameraPos = Camera.GetPosition();
+        // Find all the paintings we control.
         local links = Link.GetAll("ControlDevice", self);
         local paintings = [];
-        foreach (link in links) {
+        foreach (link in links)
             paintings.append(LinkDest(link));
-        }
-        foreach (o in paintings) {
-            // Look for a good candidate:
-            // - must be on screen
-            //
-            // BUG: note that the periapt osm is currently interfering with
-            //      the visibility stuff, so the game thinks the painting is
-            //      always rendered :(
-            if (! Object.RenderedThisFrame(o)) {
-                Log(Object_Description(o)+": Not rendered");
-                if (! ALWAYS_BLINK)
-                    continue;
-            }
-            // - must not be right up close (in XY)
-            local pos = Object.Position(o);
-            local dist = (pos - cameraPos).Length();
-            if (dist <= 8.0) {
-                Log(Object_Description(o)+": Too close");
-                if (! ALWAYS_BLINK)
-                    continue;
-            }
-            // - must be peripheral, not central (unless far away)
-            if (dist <= 16.0) {
-                local dir = Camera.WorldToCamera(Object.Position(o)).GetNormalized();
-                local howCentered = dir.Dot(vector(1,0,0));
-                if (howCentered >= 0.9) {
-                    Log(Object_Description(o)+": Too central");
-                    if (! ALWAYS_BLINK)
-                        continue;
-                }
-            }
-            // - must not have blinked very recently
-            local prev = SendMessage(o, "LastBlinkTime?").tofloat();
-            if ((now - prev) < PAINTING_BLINK_INTERVAL) {
-                Log(Object_Description(o)+": Too soon");
-                if (! ALWAYS_BLINK)
-                    continue;
-            }
-            // - and must not have terrain in front of it
-            local hitPos = vector();
-            local hit = Engine.PortalRaycast(cameraPos, pos, hitPos);
-            local hitDist = (hitPos - cameraPos).Length();
-            if (hitDist < dist) {
-                Log(Object_Description(o)+": Obscured");
-                if (! ALWAYS_BLINK)
-                    continue;
-            }
+        if (paintings.len()==0)
+            return;
 
-            // Seems like an okay candidate
-            Log(Object_Description(o)+": Blink!");
-            SetData("BlinkTime", now);
-            SendMessage(o, "Blink");
-            
-            if (! ALWAYS_BLINK)
-                break;
-        }
+        // Cycle through all the indices in turn.
+        local index = -1;
+        if (IsDataSet("BlinkIndex"))
+            index = GetData("BlinkIndex");
+        index += 1;
+        if (index>=paintings.len())
+            index = 0;
+        SetData("BlinkIndex", index);
+
+        // And make it blink.
+        local obj = paintings[index];
+        SendMessage(obj, "Blink");
     }
 }
 
@@ -379,18 +312,11 @@ class Blink extends SqRootScript
         if (message().starting) {
             local tex = GetProperty("OTxtRepr0");
             SetData("BlinkOrig", tex);
-            SetData("BlinkTime", 0.0);
         }
-    }
-
-    function OnLastBlinkTime_() {
-        local lastTime = GetData("BlinkTime");
-        Reply(lastTime);
     }
 
     function OnBlink() {
         local now = GetTime();
-        SetData("BlinkTime", now);
         SetProperty("OTxtRepr0", userparams().Blink);
         SetOneShotTimer("BlinkOff", 0.08);
     }
