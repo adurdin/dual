@@ -1,16 +1,10 @@
 class ElevatorPatroller extends SqRootScript {
     function StartPatrolling() {
-        print("++++ StartPatrolling");
-        if (! Object.HasMetaProperty(self, "M-DoesPatrol")) {
-            print("     Adding metaprop");
-            Object.AddMetaProperty(self, "M-DoesPatrol");
-        }
+        SetProperty("AI_Patrol", true);
     }
 
     function StopPatrolling() {
-        if (Object.HasMetaProperty(self, "M-DoesPatrol")) {
-            Object.RemoveMetaProperty(self, "M-DoesPatrol");
-        }
+        SetProperty("AI_Patrol", false);
     }
 /*
     function OnResumePatrolling() {
@@ -41,7 +35,6 @@ class ElevatorPatroller extends SqRootScript {
 
     function OnPatrolPoint() {
         print(Object_Description(self)+": "+message().message + " trol " + Object_Description(message().patrolObj));
-
         local trol = message().patrolObj;
         if (trol) {
             local result = SendMessage(trol, "ReachedPatrolPt");
@@ -56,18 +49,35 @@ class ElevatorPatroller extends SqRootScript {
 
                 // Wait here until the patrol point tells us otherwise.
                 // TODO: conversation, cancel mechanism, alert state handling, blah blah
+                // TODO: should we create this? shouldnt the trolpt do it itself? aargh
+                // TODO: need to remove this link too
                 Link.Create("Population", trol, self);
                 // Call the elevator.
                 link = Link.GetOne("~ControlDevice", trol);
                 if (link) {
-                    print("** Route link is to "+Object_Description(LinkDest(link)));
-                    SendMessage(LinkDest(link), "TurnOn");
+                    local terr = LinkDest(link);
+                    if (Object.InheritsFrom(terr, "TerrPt")) {
+                        SendMessage(terr, "TurnOn");
+                    } else {
+                        print("ERROR: need a ~CD link on the ElevatorWaitPt from its nearby TerrPt, found "+Object_Description(terr)+" instead.");
+                    }
                 } else {
-                    print("?? Missing the Route link?");
+                    print("ERROR: need a ~CD link on the ElevatorWaitPt from its nearby TerrPt, found none.");
                 }
                 break;
-            case "IdleOnElevator":
-                // TODO:
+            case "EmbarkOnElevator":
+                // Call the elevator.
+                local link = Link.GetOne("Route", trol);
+                if (link) {
+                    local terr = LinkDest(link);
+                    if (Object.InheritsFrom(terr, "TerrPt")) {
+                        SendMessage(terr, "TurnOn");
+                    } else {
+                        print("ERROR: need a Route link from the ElevatorEmbarkPt to its destination TerrPt, found "+Object_Description(terr)+" instead.");
+                    }
+                } else {
+                    print("ERROR: need a Route link from the ElevatorEmbarkPt to its destination TerrPt, found none.");
+                }
                 break;
             }
 
@@ -237,7 +247,7 @@ class ElevatorEmbarkPt extends SqRootScript {
 
     function OnReachedPatrolPt() {
         print(Object_Description(self)+": "+message().message + " from " + Object_Description(message().from));
-        Reply("IdleOnElevator");
+        Reply("EmbarkOnElevator");
     }
 }
 
