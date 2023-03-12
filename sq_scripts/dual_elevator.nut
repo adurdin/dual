@@ -13,16 +13,68 @@ class ElevatorPatroller extends SqRootScript {
         DebugLogMessage();
     }
 
+    function OnSim() {
+        if (message().starting) {
+            SetOneShotTimer("DumpPatrolStatus", 1.0);
+        }
+    }
+
+    function OnTimer() {
+        if (message().name=="DumpPatrolStatus") {
+            local status = GetProperty("AI_Patrol");
+            local link = Link.GetOne("AICurrentPatrol", self);
+            local msg;
+            if (status) {
+                msg = "patrolling to "+Object_Description(LinkDest(link));
+            } else {
+                msg = "NOT PATROLLING (to "+Object_Description(LinkDest(link))+")";
+            }
+            print("----------------------------- "+msg);
+            SetOneShotTimer("DumpPatrolStatus", 1.0);
+        }
+
+        if (message().name=="ResetPatrol") {
+            DebugLogMessage();
+            local trolName = message().data;
+            if (trolName==null) {
+                print("NOTE: no trolName");
+                return;
+            }
+            local trol = Object.Named(trolName);
+            if (trol==0) {
+                print("ERROR: cant find object named "+trolName);
+                return;
+            }
+            Link.Create("AICurrentPatrol", self, trol);
+            // // HACK! but not working?
+            // AI.ClearGoals(self);
+            // Object.Teleport(self, vector(), vector(), self); // HACK: force the AI to re-pathfind.
+            SetProperty("AI_Patrol", true);
+            // Object.Teleport(self, Object.Position(trol), Object.Facing(self)); // HACK!
+            // // Property.SetSimple(self, "AI_Patrol", true);
+            local link = Link.GetOne("AICurrentPatrol", self);
+            print("New patrol target: "+Object_Description(LinkDest(link)));
+        }
+    }
+
     function OnPatrolPoint() {
         DebugLogMessage();
         local trol = message().patrolObj;
-        print("@@ "+Object_Description(trol));
         // TODO - how do we _properly_ determine if we should react to this point?
         //        i dont actually know!
-        if (Property.Possessed(trol, "AI_WtchPnt")) {
-            print("@@@@ Created Watch");
-            Link.Create("AIWatchObj", self, trol);
-            // AI.ClearGoals(self);
+        // if (Property.Possessed(trol, "AI_WtchPnt")) {
+        //     print("@@@@ Created Watch");
+        //     Link.Create("AIWatchObj", self, trol);
+        //     // AI.ClearGoals(self);
+        // }
+        if (Property.Possessed(trol, "AI_Converation")) {
+            if (! Link.AnyExist("AIConversationActor", trol)) {
+                print("@@ Creating actor link.");
+                local link = Link.Create("AIConversationActor", trol, self);
+                LinkTools.LinkSetData(link, "Actor ID", 1);
+            }
+            local result = AI.StartConversation(trol);
+            print("@@@@ Started conversation on "+Object_Description(trol)+" result: "+result);
         }
     }
 
@@ -128,6 +180,7 @@ class ElevatorPatroller extends SqRootScript {
         pt, such that the ai will *not* think it has reached that intermediate
         UNTIL the pseudoscript ends...?  <<<< THIS should be the next line
                                               of experiment!
+    */
 
     function OnWaitForElevatorArrival() {
         DebugLogMessage();
@@ -136,11 +189,11 @@ class ElevatorPatroller extends SqRootScript {
         local elevatorReady = (GetData("ElevatorAt")==terrName);
         if (elevatorReady) {
             print("#### Elevator is ready");
-            local embark = Object.Named(embarkName);
-            if (! embark) {
-                print("ERROR: no embark point named "+embarkName);
-                return;
-            }
+            // local embark = Object.Named(embarkName);
+            // if (! embark) {
+            //     print("ERROR: no embark point named "+embarkName);
+            //     return;
+            // }
             // if (Property.Possessed(embark, "AI_WtchPnt")) {
             //     Link.Create("AIWatchObj", self, embark);
             //     AI.ClearGoals(self);
@@ -159,6 +212,25 @@ class ElevatorPatroller extends SqRootScript {
     function OnStopWaitingForElevator() {
         DebugLogMessage();
         print("########## stop waiting");
+        local trolName = message().data;
+        if (trolName==null) {
+            print("NOTE: no trolName");
+            Reply(false);
+            return;
+        }
+        local trol = Object.Named(trolName);
+        if (trol==0) {
+            print("ERROR: cant find object named "+trolName);
+            Reply(false);
+            return;
+        }
+        print("Changing patrol to "+Object_Description(trol));
+        // // Property.SetSimple(self, "AI_Patrol", false);
+        local link = Link.GetOne("AICurrentPatrol", self);
+        print("Old patrol target: "+Object_Description(LinkDest(link)));
+        Link.DestroyMany("AICurrentPatrol", self, 0);
+        SetProperty("AI_Patrol", false);
+        SetOneShotTimer("ResetPatrol", 1.5, trolName);
     }
 }
 
