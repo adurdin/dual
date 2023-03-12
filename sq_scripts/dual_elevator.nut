@@ -1,170 +1,168 @@
 class ElevatorPatroller extends SqRootScript {
-    function StartPatrolling() {
-        SetProperty("AI_Patrol", true);
+    function DebugLogMessage() {
+        print("**** "+message().message
+            +" to:"+Object_Description(self)
+            +" from:"+Object_Description(message().from)
+            +" data:"+message().data
+            +" data2:"+message().data2
+            +" data3:"+message().data3
+            +" ****");
     }
 
-    function StopPatrolling() {
-        SetProperty("AI_Patrol", false);
+    function OnMessage() {
+        DebugLogMessage();
     }
-/*
-    function OnResumePatrolling() {
-        print(Object_Description(self)+": "+message().message);
-
-        local trol = 0;
-        foreach (link in Link.GetAll("ScriptParams", self)) {
-            local data = LinkTools.LinkGetData(link, "");
-            if (data=="ResumePatrol") {
-                trol = LinkDest(link);
-            }
-        }
-        Link.DestroyMany("ScriptParams", self, 0);
-        
-        Object.Teleport(self, vector(), vector(), self); // HACK?
-
-        if (trol) {
-            if (! Link.AnyExist("AICurrentPatrol", self)) {
-                print("Creating AICurrentPatrol to "+trol);
-                Link.Create("AICurrentPatrol", self, trol);
-            } else {
-                print("HUH??? AICurrentPatrol already exists!");
-            }
-            StartPatrolling();
-        }
-    }
-*/
 
     function OnPatrolPoint() {
-        print(Object_Description(self)+": "+message().message + " trol " + Object_Description(message().patrolObj));
+        DebugLogMessage();
         local trol = message().patrolObj;
-        if (trol) {
-            local result = SendMessage(trol, "ReachedPatrolPt");
-            print("ReachedPatrolPt result: "+result+" ("+(typeof result)+")");
+        print("@@ "+Object_Description(trol));
+        // TODO - how do we _properly_ determine if we should react to this point?
+        //        i dont actually know!
+        if (Property.Possessed(trol, "AI_WtchPnt")) {
+            print("@@@@ Created Watch");
+            Link.Create("AIWatchObj", self, trol);
+            // AI.ClearGoals(self);
+        }
+    }
 
-            switch (result) {
-            case "WaitForElevator":
-                print("Waiting...");
-                StopPatrolling();
-                local link = Link.GetOne("Route", trol);
-                Link_SetCurrentPatrol(self, LinkDest(link));
+    function OnPatrolTo() {
+        DebugLogMessage();
+        local trol;
+        local trolName = message().data;
+        if (trolName==null) {
+            print("ERROR: no trolName");
+            Reply(false);
+            return;
+        }
+        trol = Object.Named(trolName);
+        if (trol==0) {
+            print("ERROR: cant find object named "+trolName);
+            Reply(false);
+            return;
+        }
+        // print("Patrolling to "+Object_Description(trol));
+        // // Property.SetSimple(self, "AI_Patrol", false);
+        // local link = Link.GetOne("AICurrentPatrol", self);
+        // print("Old patrol target: "+Object_Description(LinkDest(link)));
+        // Link.DestroyMany("AICurrentPatrol", self, 0);
+        // /////////////////////////
+        // // SO: this doesnt work, because once at the top of the elevator, the ai
+        // // thinks it is in the path cell at the bottom. this is hard to resolve!
+        // // TO DEAL WITH THIS in the elevator demo, i had the ai's patrol path be
+        // // continuous up and down the elevator shaft. this let it walk off when
+        // // going up to the top.
+        // // BUT: that didnt seem to work reliably when trying to path back onto
+        // // the elevator!
+        // // // HACK! but not working:
+        // // AI.ClearGoals(self);
+        // // HACK! but not working:
+        Object.Teleport(self, vector(), vector(), self); // HACK: force the AI to re-pathfind.
+        // Object.Teleport(self, Object.Position(trol), Object.Facing(self)); // HACK!
+        // Link.Create("AICurrentPatrol", self, trol);
+        // // Property.SetSimple(self, "AI_Patrol", true);
+        // link = Link.GetOne("AICurrentPatrol", self);
+        // print("New patrol target: "+Object_Description(LinkDest(link)));
+    }
 
-                // Wait here until the patrol point tells us otherwise.
-                // TODO: conversation, cancel mechanism, alert state handling, blah blah
-                // TODO: should we create this? shouldnt the trolpt do it itself? aargh
-                // TODO: need to remove this link too
-                Link.Create("Population", trol, self);
-                // Call the elevator.
-                link = Link.GetOne("~ControlDevice", trol);
-                if (link) {
-                    local terr = LinkDest(link);
-                    if (Object.InheritsFrom(terr, "TerrPt")) {
-                        SendMessage(terr, "TurnOn");
-                    } else {
-                        print("ERROR: need a ~CD link on the ElevatorWaitPt from its nearby TerrPt, found "+Object_Description(terr)+" instead.");
-                    }
-                } else {
-                    print("ERROR: need a ~CD link on the ElevatorWaitPt from its nearby TerrPt, found none.");
-                }
-                break;
-            case "EmbarkOnElevator":
-                // Call the elevator.
-                local link = Link.GetOne("Route", trol);
-                if (link) {
-                    local terr = LinkDest(link);
-                    if (Object.InheritsFrom(terr, "TerrPt")) {
-                        SendMessage(terr, "TurnOn");
-                    } else {
-                        print("ERROR: need a Route link from the ElevatorEmbarkPt to its destination TerrPt, found "+Object_Description(terr)+" instead.");
-                    }
-                } else {
-                    print("ERROR: need a Route link from the ElevatorEmbarkPt to its destination TerrPt, found none.");
-                }
-                break;
-            }
-
+    function OnElevArrived() {
+        DebugLogMessage();
+        local terr = message().data;
+        SetData("ElevatorAt", Object.GetName(terr));
 /*
-            local terrPtLink = Link.GetOne("Route", trol);
-            local nextTrolLink = Link.GetOne("AIPatrol", trol);
-            if (terrPtLink && nextTrolLink) {
-                local terrPt = LinkDest(terrPtLink);
-                local nextTrol = LinkDest(nextTrolLink);
-                // Abort current patrol
-                StopPatrolling();
-                local current = Link.GetOne("AICurrentPatrol", self);
-                if (current) {
-                    print("Current patrol is: "+LinkDest(current));
-                //     print("Destroying current patrol to: "+LinkDest(current));
-                //     Link.Destroy(current);
-                }
-
-                // Current patrol _will_ be destroyed before next tick, so lets
-                // use a different link to track it.
-                print("Creating ScriptParams link to "+nextTrol);
-                local link = Link.Create("ScriptParams", self, nextTrol);
-                LinkTools.LinkSetData(link, "", "ResumePatrol");
-
-                print("Creating ScriptParams link to "+terrPt);
-                local link = Link.Create("ScriptParams", self, terrPt);
-                LinkTools.LinkSetData(link, "", "NotifyMe");
-
-                // // Prepare for resuming
-                // Link.Create("AICurrentPatrol", self, nextTrol);
-                // Tell the elevator to move
-                print("Sending TurnOn to: "+terrPt);
-                SendMessage(terrPt, "TurnOn");
-            } else if (terrPtLink) {
-                print(trol+" has Route link to TerrPt, but is missing AIPatrol link to where to resume patrol.");
-            } else if (nextTrolLink) {
-                print(trol+" has AIPatrol link to resume patrol, but is missing Route link to TerrPt.");
-            }
+        if (IsOnElevator()) {
+            SetOnElevator(false);
+            // Just patrol off the elevator, auto-selecting the patrol.
+            // point. No need to do anything else!
+            print("################################################");
+            local link = Link.GetOne("AICurrentPatrol", self);
+            print("Current patrol: "+Object_Description(LinkDest(link)));
+            SetProperty("AI_Patrol", false);
+            // AI.ClearGoals(self);
+            Link.DestroyMany("AICurrentPatrol", self, 0);
+            SetProperty("AI_Patrol", true);
+            link = Link.GetOne("AICurrentPatrol", self);
+            print("New patrol: "+Object_Description(LinkDest(link)));
+        } else {
+            print("Not on the elevator????");
+        }
+        // GetProperty("AI_Patrol")
+        // if (! GetProperty("AI_Patrol")) {
+        // }
+        // TODO: if we are waiting for the elevator, now we need to get on it!
 */
-        }
     }
 
-    function OnTurnOn() {
-        // TODO: this is not the best message to use, its too generic
-        local trol = message().from;
-        Link.DestroyMany("~ControlDevice", self, 0);
-        // TODO: HERE: for some reason the guy doesnt start patrolling again?
-        print("current patrol is: "+Object_Description(Link_GetCurrentPatrol(self)));
-        StartPatrolling();
-        print("current patrol is: "+Object_Description(Link_GetCurrentPatrol(self)));
+    function OnElevDeparted() {
+        DebugLogMessage();
+        local terr = message().data;
+        ClearData("ElevatorAt");
     }
 
+    /** HERE: TODO: so, the problem is that pathfinding breaks down OFTEN. and
+        when that happens, the AI gets its patrol property turned off, and
+        moreover it seems the Watch links we are creating fail to trigger!
+        turning the patrol property back on we _can_ do, but first we have to
+        resolve the Watch problem.
 
-    // TODO: obsolete?
-    function OnElevatorStarting() {
-        print(Object_Description(self)+": "+message().message + " from " + Object_Description(message().from));
-        SendMessage(self, "StopPatrolling");
-    }
+        The self-destructing pathable objects were an attempt to ensure there
+        would always be an available path cell in the embark places to prevent
+        pathfinding fails, but it didnt entirely work. when they were the same
+        height as the elevator, it seemed to work for the bottom point, but the
+        top point then _couldnt_ disembark! it seemed the npc patrolled "up"
+        the shaft into a cell from the pathable obj from where it then couldnt
+        find the cell from the elevator! or something like that.
 
-    function OnElevatorStopping() {
-        print(Object_Description(self)+": "+message().message + " from " + Object_Description(message().from));
-        SendMessage(self, "StartPatrolling");
-    }
+        possibly adding a Conversation property to the patrol point, and having
+        the patroller trigger that when reaching it (instead of creating the
+        AIWatchObj link) might work better? at least triggering the conversation
+        should be reliable (i hope!).
 
-    function OnStartPatrolling() {
-        print(Object_Description(self)+": "+message().message + " from " + Object_Description(message().from));
-        if (! Object.HasMetaProperty(self, "M-DoesPatrol")) {
-            Object.AddMetaProperty(self, "M-DoesPatrol");
-            print("Added M-DoesPatrol");
+        further work: if the patroller gives up while waiting for the elevator
+        at the top or bottom, we should try to reset them to a different trolpt
+        (probably via a parameter on the StopWaitingForElevator message).
+        although i have struggled with that!
+
+        several of these problems might perhaps be solved if we require the
+        "wait" trolpt to have at least one trolpt between it and the "embark"
+        pt, such that the ai will *not* think it has reached that intermediate
+        UNTIL the pseudoscript ends...?  <<<< THIS should be the next line
+                                              of experiment!
+
+    function OnWaitForElevatorArrival() {
+        DebugLogMessage();
+        local terrName = message().data;
+        local embarkName = message().data2;
+        local elevatorReady = (GetData("ElevatorAt")==terrName);
+        if (elevatorReady) {
+            print("#### Elevator is ready");
+            local embark = Object.Named(embarkName);
+            if (! embark) {
+                print("ERROR: no embark point named "+embarkName);
+                return;
+            }
+            // if (Property.Possessed(embark, "AI_WtchPnt")) {
+            //     Link.Create("AIWatchObj", self, embark);
+            //     AI.ClearGoals(self);
+            // } else {
+            //     print("ERROR: embark point "+Object_Description(embark)+" has no Watch Link Defaults.");
+            //     return;
+            // }
+            Reply(false);
         } else {
-            print("Already got M-DoesPatrol on " + self);
+            print("#### Elevator is NOT READY");
+            // We rely on the pseudoscript to keep on trying over time.
+            Reply(true);
         }
     }
 
-    function OnStopPatrolling() {
-        print(Object_Description(self)+": "+message().message + " from " + Object_Description(message().from));
-        if (Object.HasMetaProperty(self, "M-DoesPatrol")) {
-            Object.RemoveMetaProperty(self, "M-DoesPatrol");
-            print("Removed M-DoesPatrol");
-        } else {
-            print("No M-DoesPatrol on " + self);
-        }
+    function OnStopWaitingForElevator() {
+        DebugLogMessage();
+        print("########## stop waiting");
     }
-
 }
 
-class FancyElevator extends SqRootScript {
+class ElevatorNotify extends SqRootScript {
     /* Use a singular Route link to keep track of which TerrPt we
     ** are at, when stopped. When we get a Call message, we can
     ** use this info to figure out if we are going to actually
@@ -175,8 +173,10 @@ class FancyElevator extends SqRootScript {
     ** point and re-called to it, the MovingTerrain/Active
     ** property is not reliable.)
     **
-    ** When we reach a TerrPt, tell it we have arrived. When
-    ** we leave it, tell it that we have left.
+    ** When we reach a TerrPt, send it ElevArrived. When we leave
+    ** it, send it ElevDeparted. Also, broadcast these messages
+    ** with the TerrPt as data along outgoing Population links
+    ** to all interested parties.
     */
 
     function GetAtPoint() {
@@ -195,51 +195,71 @@ class FancyElevator extends SqRootScript {
         Link.Create("Route", self, pt);
     }
 
+    function BroadcastToListeners(message, data) {
+        // NOTE: calling SendMessage() will usually disrupt a link query,
+        //       so we have to first find all the listeners first, and only
+        //       then send them the message. We can't use Link.Broadcast...()
+        //       because it doesn't support sending any extra data.
+        local listeners = [];
+        foreach (link in Link.GetAll("Population", self)) {
+            listeners.append(LinkDest(link));
+        }
+        foreach (obj in listeners) {
+            SendMessage(obj, message, data);
+        }
+    }
+
     function OnSim() {
         if (message().starting) {
             local link = Link.GetOne("TPathInit", self);
-            if (! link) return;
+            if (! link) {
+                print("WARNING: elevator "+self+" does not have a TPathInit link.");
+                return;
+            }
             local atPt = LinkDest(link);
             SetAtPoint(atPt);
-            if (atPt) {
-                SendMessage(atPt, "Arriving");
-            }
+            SendMessage(atPt, "ElevArrived");
+            BroadcastToListeners("ElevArrived", atPt);
         }
     }
 
     function OnStopping() {
-        local nextPt = LinkDest(Link.GetOne("TPathNext", self));
-        SetAtPoint(nextPt);
-        if (nextPt) {
-            SendMessage(nextPt, "Arriving");
+        local link = Link.GetOne("TPathNext", self);
+        if (! link) {
+            print("WARNING: elevator "+self+" path simply ends.");
+            return;
         }
+        local nextPt = LinkDest(link);
+        SetAtPoint(nextPt);
+        SendMessage(nextPt, "ElevArrived");
+        BroadcastToListeners("ElevArrived", nextPt);
     }
 
     function OnCall() {
-        local fromPt = message().from;
         local atPt = GetAtPoint();
-        if (fromPt==atPt) return;
+        // Do nothing if the elevator is between points.
+        if (! atPt) return;
+        // Ignore if we are called to the point we are already at. The elevator
+        // script itself won't see this as important and won't send a Stopping
+        // message either, so we won't have a dangling message problem.
+        if (atPt==message().from) return;
         ClearAtPoint();
-        if (atPt) {
-            SendMessage(atPt, "Departing");
-        }
+        SendMessage(atPt, "ElevDeparted");
+        BroadcastToListeners("ElevDeparted", atPt);
     }
 }
 
+// TODO - i think i can discard this class (but keep it for now for debugging
+//        as it can turn on the light.
+//        but, make sure to remove it from the TerrPts when we delete the class.
 class FancyTerrPt extends SqRootScript {
     function OnMessage() {
         print(Object_Description(self)+": "+message().message + " from " + Object_Description(message().from));
     }
-
-    function OnArriving() {
-        Link.BroadcastOnAllLinks(self, "TurnOn", "ControlDevice");
-    }
-
-    function OnDeparting() {
-        Link.BroadcastOnAllLinks(self, "TurnOff", "ControlDevice");
-    }
 }
 
+// TODO - i think i can discard this class
+//        but, make sure to remove it from the TerrPts when we delete the class.
 class ElevatorEmbarkPt extends SqRootScript {
     function OnMessage() {
         print(Object_Description(self)+": "+message().message + " from " + Object_Description(message().from));
@@ -251,26 +271,19 @@ class ElevatorEmbarkPt extends SqRootScript {
     }
 }
 
+// TODO - i think i can discard this class????
+//        well. maybe the Enabled() /TurnOn()/TurnOff() bits of it? maybe?
+//        but! for right now it is maybe involved??
 class ElevatorWaitPt extends SqRootScript {
     function IsEnabled() {
-        return Link.AnyExist("AIPatrol", self);
+        return (GetData("Enabled")==1);
     }
 
     function SetEnabled(enabled) {
         if (enabled) {
-            local link = Link.GetOne("Route", self);
-            if (link) {
-                Link.Create("AIPatrol", self, LinkDest(link));
-                Link.Destroy(link);
-                // TODO: notify?
-            }
+            SetData("Enabled", 1);
         } else {
-            local link = Link.GetOne("AIPatrol", self);
-            if (link) {
-                Link.Create("Route", self, LinkDest(link));
-                Link.Destroy(link);
-                // TODO: notify?
-            }
+            SetData("Enabled", 0);
         }
     }
 
