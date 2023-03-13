@@ -1,3 +1,30 @@
+// TODO: remember to put the wardrobe thingy back when deleting the orange brushes!
+
+    /** HERE: TODO: okay, so i want as much as possible to keep the behaviour
+        triggered only by reaching the relevant patrol points. that way other
+        ai behaviours (fleeing, combat, etc) can override it, and when calmed
+        down and going back to patrolling, we can retrigger, maybe?
+
+            (problem: if we only trigger when patrolling to the wait point, and
+            then something escalates while there, wont resuming patrol try to
+            go to the embark point, and not retrigger?
+
+            maybe while waiting we turn off patrolling, and adopt a script that,
+            on alert, sets AICurrentPatrol to the wait point and reenables
+            patrolling (to come back after calming down)? this could maybe be
+            done via the conversation abort steps sending a "ResumePatrolling"
+            message with data=WaitPointName, rather than tracking state in
+            the script?
+
+        so far it seems that pathfinding breaking down isnt breaking the
+        conversation triggers though, like it did the watches.
+
+        ...
+
+
+    */
+
+
 class ElevatorPatroller extends SqRootScript {
     function DebugLogMessage() {
         print("**** "+message().message
@@ -151,37 +178,6 @@ class ElevatorPatroller extends SqRootScript {
         ClearData("ElevatorAt");
     }
 
-    /** HERE: TODO: so, the problem is that pathfinding breaks down OFTEN. and
-        when that happens, the AI gets its patrol property turned off, and
-        moreover it seems the Watch links we are creating fail to trigger!
-        turning the patrol property back on we _can_ do, but first we have to
-        resolve the Watch problem.
-
-        The self-destructing pathable objects were an attempt to ensure there
-        would always be an available path cell in the embark places to prevent
-        pathfinding fails, but it didnt entirely work. when they were the same
-        height as the elevator, it seemed to work for the bottom point, but the
-        top point then _couldnt_ disembark! it seemed the npc patrolled "up"
-        the shaft into a cell from the pathable obj from where it then couldnt
-        find the cell from the elevator! or something like that.
-
-        possibly adding a Conversation property to the patrol point, and having
-        the patroller trigger that when reaching it (instead of creating the
-        AIWatchObj link) might work better? at least triggering the conversation
-        should be reliable (i hope!).
-
-        further work: if the patroller gives up while waiting for the elevator
-        at the top or bottom, we should try to reset them to a different trolpt
-        (probably via a parameter on the StopWaitingForElevator message).
-        although i have struggled with that!
-
-        several of these problems might perhaps be solved if we require the
-        "wait" trolpt to have at least one trolpt between it and the "embark"
-        pt, such that the ai will *not* think it has reached that intermediate
-        UNTIL the pseudoscript ends...?  <<<< THIS should be the next line
-                                              of experiment!
-    */
-
     function OnWaitForElevatorArrival() {
         DebugLogMessage();
         local terrName = message().data;
@@ -235,20 +231,27 @@ class ElevatorPatroller extends SqRootScript {
 }
 
 class ElevatorNotify extends SqRootScript {
-    /* Use a singular Route link to keep track of which TerrPt we
-    ** are at, when stopped. When we get a Call message, we can
-    ** use this info to figure out if we are going to actually
-    ** move or not.
+    /* Put this on the Vator class so that it can reliably track
+    ** which TerrPt it is stopped at (if any). An elevator with
+    ** this script will:
     **
-    ** (All this is necessary because the elevator itself
-    ** doesn't provide this information; and when stopped at a
-    ** point and re-called to it, the MovingTerrain/Active
-    ** property is not reliable.)
+    **   - notify each TerrPt it stops at with an ElevArrived message.
+    **   - notify each TerrPt it leaves with an ElevDeparted message.
+    **   - notify all interested parties of its movements with ElevArrived
+    **     and ElevDeparted messages as it moves; the data of the message
+    **     is the TerrPt it arrived at/departed from. An interested party
+    **     is any object linked from this elevator with a Population link.
+    **   - reply to At? messages with the TerrPt it is stopped at, or
+    **     with 0 if it is in motion.
     **
-    ** When we reach a TerrPt, send it ElevArrived. When we leave
-    ** it, send it ElevDeparted. Also, broadcast these messages
-    ** with the TerrPt as data along outgoing Population links
-    ** to all interested parties.
+    ** Details: uses a singular Route link from this elevator to keep track
+    ** of which TerrPt it is at. When getting a Call message, this elevator
+    ** needs to use this to figure out if it is actually going to move or not.
+    **
+    ** All this is necessary because a StdElevator itself doesn't provide this
+    ** information; and when stopped at a TerrPt and re-called to it, the
+    ** Stopping self-message may not be sent, and the MovingTerrain/Active
+    ** property is not reliable (it sometimes remains on).
     */
 
     function GetAtPoint() {
@@ -290,7 +293,7 @@ class ElevatorNotify extends SqRootScript {
             }
             local atPt = LinkDest(link);
             SetAtPoint(atPt);
-            SendMessage(atPt, "ElevArrived");
+            SendMessage(atPt, "ElevArrived", atPt);
             BroadcastToListeners("ElevArrived", atPt);
         }
     }
@@ -301,10 +304,10 @@ class ElevatorNotify extends SqRootScript {
             print("WARNING: elevator "+self+" path simply ends.");
             return;
         }
-        local nextPt = LinkDest(link);
-        SetAtPoint(nextPt);
-        SendMessage(nextPt, "ElevArrived");
-        BroadcastToListeners("ElevArrived", nextPt);
+        local atPt = LinkDest(link);
+        SetAtPoint(atPt);
+        SendMessage(atPt, "ElevArrived", atPt);
+        BroadcastToListeners("ElevArrived", atPt);
     }
 
     function OnCall() {
@@ -316,75 +319,62 @@ class ElevatorNotify extends SqRootScript {
         // message either, so we won't have a dangling message problem.
         if (atPt==message().from) return;
         ClearAtPoint();
-        SendMessage(atPt, "ElevDeparted");
+        SendMessage(atPt, "ElevDeparted", atPt);
         BroadcastToListeners("ElevDeparted", atPt);
     }
-}
 
-// TODO - i think i can discard this class (but keep it for now for debugging
-//        as it can turn on the light.
-//        but, make sure to remove it from the TerrPts when we delete the class.
-class FancyTerrPt extends SqRootScript {
-    function OnMessage() {
-        print(Object_Description(self)+": "+message().message + " from " + Object_Description(message().from));
+    function OnAt_() {
+        Reply(GetAtPoint());
     }
 }
 
-// TODO - i think i can discard this class
-//        but, make sure to remove it from the TerrPts when we delete the class.
-class ElevatorEmbarkPt extends SqRootScript {
-    function OnMessage() {
-        print(Object_Description(self)+": "+message().message + " from " + Object_Description(message().from));
+class ElevPaused extends SqRootScript {
+    /* Intended for use on a metaprop. Prevents the elevator from responding
+    ** to calls while this script is active. Once the script is removed, it
+    ** will process the last call that it received.
+    */
+    function GetLastCalledPt() {
+        foreach (link in Link.GetAll("ScriptParams", self)) {
+            if (LinkTools.LinkGetData(link, "")=="ElevPausedLink") {
+                return LinkDest(link)
+            }
+        }
+        return 0;
     }
 
-    function OnReachedPatrolPt() {
-        print(Object_Description(self)+": "+message().message + " from " + Object_Description(message().from));
-        Reply("EmbarkOnElevator");
+    function SetLastCalledPt(terr) {
+        local links = [];
+        foreach (link in Link.GetAll("ScriptParams", self)) {
+            if (LinkTools.LinkGetData(link, "")=="ElevPausedLink") {
+                links.append(link);
+            }
+        }
+        foreach (link in links) {
+            Link.Destroy(link);
+        }
+        if (terr) {
+            local link = Link.Create("ScriptParams", self, terr);
+            LinkTools.LinkSetData(link, "", "ElevPausedLink");
+            return link;
+        }
+        return 0;
     }
-}
 
-// TODO - i think i can discard this class????
-//        well. maybe the Enabled() /TurnOn()/TurnOff() bits of it? maybe?
-//        but! for right now it is maybe involved??
-class ElevatorWaitPt extends SqRootScript {
-    function IsEnabled() {
-        return (GetData("Enabled")==1);
+    function OnBeginScript() {
+        SetLastCalledPt(0);
     }
 
-    function SetEnabled(enabled) {
-        if (enabled) {
-            SetData("Enabled", 1);
-        } else {
-            SetData("Enabled", 0);
+    function OnEndScript() {
+        local terr = GetLastCalledPt();
+        SetLastCalledPt(0);
+        if (terr) {
+            PostMessage(terr, "TurnOn");
         }
     }
 
-    function OnMessage() {
-        print(Object_Description(self)+": "+message().message + " from " + Object_Description(message().from));
-    }
-
-    function OnReachedPatrolPt() {
-        print(Object_Description(self)+": "+message().message + " from " + Object_Description(message().from));
-        if (! IsEnabled()) {
-            //Link.Create("Population", self, from?)
-            Reply("WaitForElevator");
-        } else {
-            Reply("ElevatorIsReady");
-        }
-    }
-
-    function OnTurnOn() {
-        print(Object_Description(self)+": "+message().message + " from " + Object_Description(message().from));
-        SetEnabled(true);
-        Link.BroadcastOnAllLinks(self, "TurnOn", "Population");
-        // EnableEmbarkLink(true);
-        // NotifyPatrollers();
-    }
-
-    function OnTurnOff() {
-        print(Object_Description(self)+": "+message().message + " from " + Object_Description(message().from));
-        Link.BroadcastOnAllLinks(self, "TurnOff", "Population");
-        SetEnabled(false);
+    function OnCall() {
+        SetLastCalledPt(message().from);
+        BlockMessage();
+        Reply(false);
     }
 }
-
