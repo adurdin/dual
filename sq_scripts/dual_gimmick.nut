@@ -401,7 +401,10 @@ class TrampleBook extends SqRootScript {
     }
 }
 
-/*
+/* NOTE: all this was trying to wrangle the ruins-kitchen burrick into
+         meleeing the barrels on its way down the tunnel. (TODO: maybe it
+         should just crush them by walking into them?? much simpler...)
+
 class HurtMeBaby extends SqRootScript {
     function OnBeginScript() {
         Physics.SubscribeMsg(self, ePhysScriptMsgType.kCollisionMsg);
@@ -481,3 +484,74 @@ class MeleeObstacles extends SqRootScript {
     }
 }
 */
+
+class BookCarrier extends SqRootScript {
+    /* For the book-carrying AI. Responds to message from their
+       AIWatchObj pseudoscripts to cancel/continue the script
+       according to the "carrying" state. */
+
+    function OnPickUpBooks() {
+        // If somehow we are already carrying books (shouldn't happen),
+        // then don't pick up any more.
+        local isCarrying = Object.HasMetaProperty(self, "M-CarryingBooks");
+        Reply(! isCarrying);
+    }
+
+    function OnDropOffBooks() {
+        // If we are not carrying books (e.g. we got scared and dropped
+        // them), don't try to drop them off.
+        local isCarrying = Object.HasMetaProperty(self, "M-CarryingBooks");
+        Reply(isCarrying);
+    }
+}
+
+class IsCarryingBooks extends SqRootScript {
+    /* For use on the M-CarryingBooks metaprop. */
+
+    function OnBeginScript() {
+        SpawnBookPile();
+    }
+
+    function OnEndScript() {
+        // Destroy the book pile without slaying it, so that
+        // we don't create flinders.
+        local obj = GetBookPile();
+        if (obj) {
+            Object.Destroy(obj);
+        }
+    }
+
+    function GetBookPile() {
+        foreach (link in Link.GetAll("~DetailAttachement", self)) {
+            local obj = LinkDest(link);
+            if (Object.InheritsFrom(obj, "CarryBookPile")) {
+                return obj;
+            }
+        }
+        return 0;
+    }
+
+    function SpawnBookPile() {
+        local obj = GetBookPile();
+        if (obj) return obj;
+        obj = Object.Create("CarryBookPile");
+        local link = Link.Create("DetailAttachement", obj, self);
+        // Hardcoding the relative position and orientation here
+        // is just simpler than doing anything more general.
+        LinkTools.LinkSetData(link, "Type", 2); // Joint
+        LinkTools.LinkSetData(link, "joint", 3); // Abdomen
+        LinkTools.LinkSetData(link, "rel pos", vector(1.27432,-1.04076,1.18916));
+        LinkTools.LinkSetData(link, "rel rot", vector(0,352.546,0));
+        return obj;
+    }
+
+    function OnAlertness() {
+        if (message().level>message().oldLevel
+        && message().level>=3) {
+            // Slay the book pile so that we get lovely flinders.
+            local obj = GetBookPile();
+            Damage.Slay(obj, self);
+            Object.RemoveMetaProperty(self, "M-CarryingBooks");
+        }
+    }
+}
