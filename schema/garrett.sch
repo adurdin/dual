@@ -169,6 +169,7 @@ volume -1
 no_repeat
 ghmagic1 ghmagic2 ghmagic3
 env_tag (Event Damage) (DamageType Zap) (Damage 1 100) (Health 1 100) (CreatureType Player) (ArrowType MagicMissile)
+env_tag (Event Damage) (DamageType Zap) (Damage 1 100) (Health 1 100) (CreatureType Player)
 
 //TAKING FIREBOLT DAMAGE
 schema ghfirebolt
@@ -236,14 +237,14 @@ schema gardeath2
 archetype PLYR_DAMAGE
 volume -1
 garfire
-env_tag (Event Damage) (CreatureType Player) (DamageType Fire) (Damage 1 100) (Health 0 0)
+env_tag (Event Damage) (CreatureType Player) (DamageType Fire Zap) (Damage 1 100) (Health 0 0)
 
 //DEATH LOUD -IMPACTS
 schema gardeath3
 archetype PLYR_DAMAGE
 volume -1
 garfire1 garfire2
-env_tag (Event Damage) (CreatureType Player) (DamageType Bash Concussion Slash Poke Zap) (Damage 1 100) (Health 0 0)
+env_tag (Event Damage) (CreatureType Player) (DamageType Bash Concussion Slash Poke) (Damage 1 100) (Health 0 0)
 
 
 

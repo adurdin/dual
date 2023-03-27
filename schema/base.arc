@@ -59,6 +59,8 @@ archetype AMBIENTS
 schema AMB_M16	//Endgame
 archetype AMBIENTS
 
+schema AMB_DUAL //Dual mission
+archetype AMBIENTS
 
 
 //----------SPEECH----------//

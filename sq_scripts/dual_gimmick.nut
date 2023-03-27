@@ -555,3 +555,14 @@ class IsCarryingBooks extends SqRootScript {
         }
     }
 }
+
+class ToggleShocking extends SqRootScript {
+    function OnTurnOn() {
+        if (! Object.HasMetaProperty(self, "M-Shocking"))
+            Object.AddMetaProperty(self, "M-Shocking");
+    }
+
+    function OnTurnOff() {
+        Object.RemoveMetaProperty(self, "M-Shocking");
+    }
+}
