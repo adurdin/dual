@@ -556,13 +556,41 @@ class IsCarryingBooks extends SqRootScript {
     }
 }
 
+class PhysAREnterExit extends SqRootScript {
+    // TODO: delete print()s
+    function OnBeginScript() {
+        print(Object_Description(self)+" "+message().message);
+        Physics.SubscribeMsg(self, ePhysScriptMsgType.kEnterExitMsg);
+    }
+
+    function OnEndScript() {
+        print(Object_Description(self)+" "+message().message);
+        Physics.UnsubscribeMsg(self, ePhysScriptMsgType.kEnterExitMsg);
+    }
+
+    function OnPhysEnter() {
+        print(Object_Description(self)+" "+message().message+", transObj:"+Object_Description(message().transObj));
+        local victim = message().transObj;
+        ActReact.EndContact(self, victim); // Don't want to add duplicate contacts, just in case (e.g. submods).
+        ActReact.BeginContact(self, victim);
+    }
+
+    function OnPhysExit() {
+        print(Object_Description(self)+" "+message().message+", transObj:"+Object_Description(message().transObj));
+        local victim = message().transObj;
+        ActReact.EndContact(self, victim);
+    }
+}
+
 class ToggleShocking extends SqRootScript {
     function OnTurnOn() {
         if (! Object.HasMetaProperty(self, "M-Shocking"))
             Object.AddMetaProperty(self, "M-Shocking");
+        Link.BroadcastOnAllLinks(self, message().message, "~ParticleAttachement");
     }
 
     function OnTurnOff() {
         Object.RemoveMetaProperty(self, "M-Shocking");
+        Link.BroadcastOnAllLinks(self, message().message, "~ParticleAttachement");
     }
 }
