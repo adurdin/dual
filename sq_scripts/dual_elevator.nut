@@ -25,9 +25,11 @@
     */
 
 
+DEBUG_ELEVATOR <- false;
+
 class ElevatorPatroller extends SqRootScript {
     function DebugLogMessage() {
-        print("**** "+message().message
+        if (DEBUG_ELEVATOR) print("**** "+message().message
             +" to:"+Object_Description(self)
             +" from:"+Object_Description(message().from)
             +" data:"+message().data
@@ -56,7 +58,7 @@ class ElevatorPatroller extends SqRootScript {
             } else {
                 msg = "NOT PATROLLING (to "+Object_Description(LinkDest(link))+")";
             }
-            print("----------------------------- "+msg);
+            if (DEBUG_ELEVATOR) print("----------------------------- "+msg);
             SetOneShotTimer("DumpPatrolStatus", 1.0);
         }
 
@@ -64,12 +66,12 @@ class ElevatorPatroller extends SqRootScript {
             DebugLogMessage();
             local trolName = message().data;
             if (trolName==null) {
-                print("NOTE: no trolName");
+                if (DEBUG_ELEVATOR) print("NOTE: no trolName");
                 return;
             }
             local trol = Object.Named(trolName);
             if (trol==0) {
-                print("ERROR: cant find object named "+trolName);
+                if (DEBUG_ELEVATOR) print("ERROR: cant find object named "+trolName);
                 return;
             }
             Link.Create("AICurrentPatrol", self, trol);
@@ -80,7 +82,7 @@ class ElevatorPatroller extends SqRootScript {
             // Object.Teleport(self, Object.Position(trol), Object.Facing(self)); // HACK!
             // // Property.SetSimple(self, "AI_Patrol", true);
             local link = Link.GetOne("AICurrentPatrol", self);
-            print("New patrol target: "+Object_Description(LinkDest(link)));
+            if (DEBUG_ELEVATOR) print("New patrol target: "+Object_Description(LinkDest(link)));
         }
     }
 
@@ -90,18 +92,18 @@ class ElevatorPatroller extends SqRootScript {
         // TODO - how do we _properly_ determine if we should react to this point?
         //        i dont actually know!
         // if (Property.Possessed(trol, "AI_WtchPnt")) {
-        //     print("@@@@ Created Watch");
+        //     if (DEBUG_ELEVATOR) print("@@@@ Created Watch");
         //     Link.Create("AIWatchObj", self, trol);
         //     // AI.ClearGoals(self);
         // }
         if (Property.Possessed(trol, "AI_Converation")) {
             if (! Link.AnyExist("AIConversationActor", trol)) {
-                print("@@ Creating actor link.");
+                if (DEBUG_ELEVATOR) print("@@ Creating actor link.");
                 local link = Link.Create("AIConversationActor", trol, self);
                 LinkTools.LinkSetData(link, "Actor ID", 1);
             }
             local result = AI.StartConversation(trol);
-            print("@@@@ Started conversation on "+Object_Description(trol)+" result: "+result);
+            if (DEBUG_ELEVATOR) print("@@@@ Started conversation on "+Object_Description(trol)+" result: "+result);
         }
     }
 
@@ -110,20 +112,20 @@ class ElevatorPatroller extends SqRootScript {
         local trol;
         local trolName = message().data;
         if (trolName==null) {
-            print("ERROR: no trolName");
+            if (DEBUG_ELEVATOR) print("ERROR: no trolName");
             Reply(false);
             return;
         }
         trol = Object.Named(trolName);
         if (trol==0) {
-            print("ERROR: cant find object named "+trolName);
+            if (DEBUG_ELEVATOR) print("ERROR: cant find object named "+trolName);
             Reply(false);
             return;
         }
-        // print("Patrolling to "+Object_Description(trol));
+        // if (DEBUG_ELEVATOR) print("Patrolling to "+Object_Description(trol));
         // // Property.SetSimple(self, "AI_Patrol", false);
         // local link = Link.GetOne("AICurrentPatrol", self);
-        // print("Old patrol target: "+Object_Description(LinkDest(link)));
+        // if (DEBUG_ELEVATOR) print("Old patrol target: "+Object_Description(LinkDest(link)));
         // Link.DestroyMany("AICurrentPatrol", self, 0);
         // /////////////////////////
         // // SO: this doesnt work, because once at the top of the elevator, the ai
@@ -141,7 +143,7 @@ class ElevatorPatroller extends SqRootScript {
         // Link.Create("AICurrentPatrol", self, trol);
         // // Property.SetSimple(self, "AI_Patrol", true);
         // link = Link.GetOne("AICurrentPatrol", self);
-        // print("New patrol target: "+Object_Description(LinkDest(link)));
+        // if (DEBUG_ELEVATOR) print("New patrol target: "+Object_Description(LinkDest(link)));
     }
 
     function OnElevArrived() {
@@ -153,17 +155,17 @@ class ElevatorPatroller extends SqRootScript {
             SetOnElevator(false);
             // Just patrol off the elevator, auto-selecting the patrol.
             // point. No need to do anything else!
-            print("################################################");
+            if (DEBUG_ELEVATOR) print("################################################");
             local link = Link.GetOne("AICurrentPatrol", self);
-            print("Current patrol: "+Object_Description(LinkDest(link)));
+            if (DEBUG_ELEVATOR) print("Current patrol: "+Object_Description(LinkDest(link)));
             SetProperty("AI_Patrol", false);
             // AI.ClearGoals(self);
             Link.DestroyMany("AICurrentPatrol", self, 0);
             SetProperty("AI_Patrol", true);
             link = Link.GetOne("AICurrentPatrol", self);
-            print("New patrol: "+Object_Description(LinkDest(link)));
+            if (DEBUG_ELEVATOR) print("New patrol: "+Object_Description(LinkDest(link)));
         } else {
-            print("Not on the elevator????");
+            if (DEBUG_ELEVATOR) print("Not on the elevator????");
         }
         // GetProperty("AI_Patrol")
         // if (! GetProperty("AI_Patrol")) {
@@ -184,22 +186,22 @@ class ElevatorPatroller extends SqRootScript {
         local embarkName = message().data2;
         local elevatorReady = (GetData("ElevatorAt")==terrName);
         if (elevatorReady) {
-            print("#### Elevator is ready");
+            if (DEBUG_ELEVATOR) print("#### Elevator is ready");
             // local embark = Object.Named(embarkName);
             // if (! embark) {
-            //     print("ERROR: no embark point named "+embarkName);
+            //     if (DEBUG_ELEVATOR) print("ERROR: no embark point named "+embarkName);
             //     return;
             // }
             // if (Property.Possessed(embark, "AI_WtchPnt")) {
             //     Link.Create("AIWatchObj", self, embark);
             //     AI.ClearGoals(self);
             // } else {
-            //     print("ERROR: embark point "+Object_Description(embark)+" has no Watch Link Defaults.");
+            //     if (DEBUG_ELEVATOR) print("ERROR: embark point "+Object_Description(embark)+" has no Watch Link Defaults.");
             //     return;
             // }
             Reply(false);
         } else {
-            print("#### Elevator is NOT READY");
+            if (DEBUG_ELEVATOR) print("#### Elevator is NOT READY");
             // We rely on the pseudoscript to keep on trying over time.
             Reply(true);
         }
@@ -207,23 +209,23 @@ class ElevatorPatroller extends SqRootScript {
 
     function OnStopWaitingForElevator() {
         DebugLogMessage();
-        print("########## stop waiting");
+        if (DEBUG_ELEVATOR) print("########## stop waiting");
         local trolName = message().data;
         if (trolName==null) {
-            print("NOTE: no trolName");
+            if (DEBUG_ELEVATOR) print("NOTE: no trolName");
             Reply(false);
             return;
         }
         local trol = Object.Named(trolName);
         if (trol==0) {
-            print("ERROR: cant find object named "+trolName);
+            if (DEBUG_ELEVATOR) print("ERROR: cant find object named "+trolName);
             Reply(false);
             return;
         }
-        print("Changing patrol to "+Object_Description(trol));
+        if (DEBUG_ELEVATOR) print("Changing patrol to "+Object_Description(trol));
         // // Property.SetSimple(self, "AI_Patrol", false);
         local link = Link.GetOne("AICurrentPatrol", self);
-        print("Old patrol target: "+Object_Description(LinkDest(link)));
+        if (DEBUG_ELEVATOR) print("Old patrol target: "+Object_Description(LinkDest(link)));
         Link.DestroyMany("AICurrentPatrol", self, 0);
         SetProperty("AI_Patrol", false);
         SetOneShotTimer("ResetPatrol", 1.5, trolName);
@@ -288,7 +290,7 @@ class ElevatorNotify extends SqRootScript {
         if (message().starting) {
             local link = Link.GetOne("TPathInit", self);
             if (! link) {
-                print("WARNING: elevator "+self+" does not have a TPathInit link.");
+                if (DEBUG_ELEVATOR) print("WARNING: elevator "+self+" does not have a TPathInit link.");
                 return;
             }
             local atPt = LinkDest(link);
@@ -301,7 +303,7 @@ class ElevatorNotify extends SqRootScript {
     function OnStopping() {
         local link = Link.GetOne("TPathNext", self);
         if (! link) {
-            print("WARNING: elevator "+self+" path simply ends.");
+            if (DEBUG_ELEVATOR) print("WARNING: elevator "+self+" path simply ends.");
             return;
         }
         local atPt = LinkDest(link);
