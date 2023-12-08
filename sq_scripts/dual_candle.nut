@@ -74,7 +74,7 @@ class AnimLightExtra extends SqRootScript {
     }
 
     function OnTweqComplete() {
-        if(message.Type==eTweqType.kTweqTypeFlicker) {
+        if(message().Type==eTweqType.kTweqTypeFlicker) {
             ChangeMode(true);
         }
     }
