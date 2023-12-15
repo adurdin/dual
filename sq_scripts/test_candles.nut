@@ -175,8 +175,16 @@ class CandlesController extends SqRootScript
 }
 
 class ActiveCandle extends SqRootScript {
+    kTimerIncrement = 0.033;
+
     function OnBeginScript() {
-        EnableCandle(self, true);
+        if (! IsDataSet("Visible")) SetData("Visible", false);
+        if (! IsDataSet("Appear")) SetData("Appear", 0.0);
+        if (! IsDataSet("AppearDone")) SetData("AppearDone", false);
+
+        if (! GetData("AppearDone")) {
+            EnableCandle(self, true);
+        }
     }
 
     function OnEndScript() {
@@ -185,26 +193,24 @@ class ActiveCandle extends SqRootScript {
 
     function GetCounterpart() {
         local link = Link.GetOne("Owns", self);
-        if (link) {
-            return LinkDest(link);
-        } else {
-            // TODO: this is no good at all, because we want the candles, even
-            //       their counterparts, to have lights! so they need to exist
-            //       in the editor!!! -- but for now this will work, we can
-            //       manually create the counterparts and set up Owns links
-            //       in the editor without breaking this script.
-            local arch = Object.Archetype(self);
-            local counterpart = Object.BeginCreate(arch);
-            // TODO: pull relative positioning from DualController? or not, if
-            //       all the counterparts are manually created, then we dont
-            //       need this branch.
-            Object.Teleport(counterpart, vector(0,0,512), vector(), self);
-            Property.SetSimple(counterpart, "RenderAlpha", 0.0);
-            Property.SetSimple(counterpart, "HasRefs", false);
-            // TODO: physics???
-            Object.EndCreate(counterpart);
-            Link.Create("Owns", self, counterpart);
-        }
+        if (link) return LinkDest(link);
+        return 0;
+    }
+
+    function CreateCounterpart() {
+        local arch = Object.Archetype(self);
+        local counterpart = Object.BeginCreate(arch);
+        // TODO: pull relative positioning from DualController? or not, if
+        //       all the counterparts are manually created, then we dont
+        //       need this branch.
+        Object.Teleport(counterpart, vector(0,0,512), vector(), self);
+        Property.SetSimple(counterpart, "RenderAlpha", 0.0);
+        Property.SetSimple(counterpart, "HasRefs", false);
+        Property.Set(counterpart, "PhysType", "Type", 3); // None
+        Object.EndCreate(counterpart);
+        Link.Create("Owns", self, counterpart);
+        SendMessage(counterpart, "TurnOff");
+        return counterpart;
     }
 
     function OnSim() {
@@ -212,21 +218,73 @@ class ActiveCandle extends SqRootScript {
             // Make sure the counterpart exists, so that we don't create huge
             // numbers of them late in the mission and maybe trip over object
             // limits then. If we are gonna hit limits, the earlier the better.
-            GetCounterpart();
+            //
+            // TODO: this is no good at all, because we want the candles, even
+            //       their counterparts, to have lights! so they need to exist
+            //       in the editor!!! -- but for now this will work, we can
+            //       manually create the counterparts and set up Owns links
+            //       in the editor without breaking this script.
+            
+            // TODO: delete this. we need to create counterparts in-editor.
+            //CreateCounterpart();
+
+            local counterpart = GetCounterpart();
+            if (counterpart) {
+                SendMessage(counterpart, "TurnOff");
+                Property.SetSimple(counterpart, "HasRefs", false);
+                Property.SetSimple(counterpart, "RenderAlpha", 0.0);
+                Property.Set(counterpart, "PhysType", "Type", 3); // None
+            } else {
+                print("ERROR: ActiveCandle "+self+" has no counterpart.");
+            }
         }
     }
 
     function OnBeginVisible() {
         print(self+" "+message().message);
+        SetData("Visible", true);
         DarkUI.TextMessage("Visible", 0x0080FF, 10000);
 
-        local counterpart = GetCounterpart();
-        Property.SetSimple(counterpart, "HasRefs", true);
-        Property.SetSimple(counterpart, "RenderAlpha", 1.0);
+        // local appear = GetData("Appear");
+        // if (appear>=1.0) return;
+        SetOneShotTimer(self, "CandleAppear", kTimerIncrement);
     }
 
     function OnEndVisible() {
         print(self+" "+message().message);
+        SetData("Visible", false);
         DarkUI.TextMessage("", 0, 1);
+    }
+
+    function OnTimer() {
+        if (message().name=="CandleAppear") {
+            local counterpart = GetCounterpart();
+            if (! counterpart) return;
+            local appear = GetData("Appear");
+            local visible = GetData("Visible");
+            // TODO: adjust step size and incorporate actual time, and tune
+            //       timing and maybe curve?
+            local step = (visible? 1.0 : -1.0)*0.005;
+            appear += step;
+            if (appear<0.0) appear = 0.0;
+            if (appear>1.0) appear = 1.0;
+            SetData("Appear", appear);
+            DarkUI.TextMessage("appear:"+(appear*1000).tointeger(), 0xFF00FF, 100);
+            Property.SetSimple(counterpart, "HasRefs", (appear>0.0));
+            Property.SetSimple(counterpart, "RenderAlpha", appear);
+            if (appear>=1.0) {
+                // We are solid now, permanently.
+                SetData("AppearDone", true);
+                Property.Set(counterpart, "PhysType", "Type", 0); // OBB
+                EnableCandle(self, false);
+                SendMessage(counterpart, "TurnOn");
+                return;
+            }
+            if (appear<=0.0) {
+                // We are faded out. No need for another timer tick.
+                return;
+            }
+            SetOneShotTimer(self, "CandleAppear", kTimerIncrement);
+        }
     }
 }
