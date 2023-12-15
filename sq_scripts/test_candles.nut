@@ -7,15 +7,15 @@ enum eCandleState {
     kInvalid = 0x10,    // either disabled, or the object id is no longer valid.
 }
 
+// Targets: a dict of (objid -> eCandleState).
+g_candles_targets <- {};
+
 class CandlesOverlay extends IDarkOverlayHandler
 {
     debug_draw_rects = true;
 
     // The CandlesController.
     m_controller = 0;
-
-    // Targets: a dict of (objid -> eCandleState).
-    m_targets = {};
 
     // keep these intrefs around so we dont allocate them every frame.
     rx1 = int_ref();
@@ -27,24 +27,9 @@ class CandlesOverlay extends IDarkOverlayHandler
         m_controller = controller;
     }
 
-    function EnableTarget(target, enable) {
-        if (target in m_targets) {
-            local state = m_targets[target];
-            state = state  & ~eCandleState.kInvalid;
-            m_targets[target] = state;
-        } else {
-            m_targets[target] <- 0;
-        }
-    }
-
-    function ClearChanged() {
-        foreach (target, state in m_targets) {
-            state = state & ~eCandleState.kChanged;
-            m_targets[target] = state;
-        }
-    }
-
     function DrawHUD() {
+        if (! m_controller) return;
+
         // TODO: will need this later to make the 'in view' decision resolution-independent.
         // Engine.GetCanvasSize(rx1, ry1);
         // local screenWidth = rx1.tofloat();
@@ -71,18 +56,21 @@ class CandlesOverlay extends IDarkOverlayHandler
         }
 
         local any_changed = false;
-        foreach (target, state in m_targets) {
+        foreach (target, state in g_candles_targets) {
             if (state & eCandleState.kInvalid) {
                 continue;
             }
             if (! Object.Exists(target)) {
-                m_targets[target] = eCandleState.kInvalid;
+                g_candles_targets[target] = eCandleState.kInvalid;
                 continue;
             }
+            print("CandlesOverlay: updating "+target+":");
             local visible = DarkOverlay.GetObjectScreenBounds(target, rx1, ry1, rx2, ry2);
+            print("  visible:"+visible);
             local was_focused = (state & eCandleState.kFocused)!=0;
+            print("  was_focused:"+was_focused);
             local is_focused = false;
-            if (visible && !was_focused) {
+            if (visible /* && !was_focused */) {
                 local x1 = rx1.tointeger();
                 local y1 = ry1.tointeger();
                 local x2 = rx2.tointeger();
@@ -99,21 +87,26 @@ class CandlesOverlay extends IDarkOverlayHandler
                     DarkOverlay.DrawLine(x1, y2, x2, y2);
                 }
             }
+            print("  is_focused:"+is_focused);
+            print("  old state:"+state);
 
-            if (state & eCandleState.kFocused) {
-                if (state & eCandleState.kChanged) {
-                    // If it was focused in at least one frame between controller updates,
-                    // we leave it that way so the focusing doesn't get skipped.
-                    continue;
-                }
+            if (was_focused==is_focused) {
+                // No change happened. Skip.
+                print("  no change; skipping state set.");
+                continue;
+            }
+            if ((state & eCandleState.kChanged) && was_focused) {
+                // If it was focused in at least one frame between controller updates,
+                // we leave it that way so the focusing doesn't get skipped.
+                print("  latched focus; skipping state set.");
+                continue;
             }
 
-            state = (is_focused? eCandleState.kFocused : 0);
-            if (is_focused!=was_focused) {
-                state = state|eCandleState.kChanged;
-                any_changed = true;
-            }
-            m_targets[target] = state;
+            any_changed = true;
+            state = eCandleState.kChanged;
+            if (is_focused) state = state | eCandleState.kFocused;
+            print("  new state:"+state);
+            g_candles_targets[target] = state;
         }
 
         if (m_controller && any_changed) {
@@ -132,8 +125,41 @@ class CandlesOverlay extends IDarkOverlayHandler
 
 g_candles_overlay <- CandlesOverlay();
 
+EnableCandle <- function(target, enable) {
+    if (target in g_candles_targets) {
+        local state = g_candles_targets[target];
+        if (enable) {
+            state = state & ~eCandleState.kInvalid;
+        } else {
+            state = state | eCandleState.kInvalid;
+        }
+        g_candles_targets[target] = state;
+    } else {
+        if (enable) {
+            g_candles_targets[target] <- 0;
+        }
+    }
+}
+
 class CandlesController extends SqRootScript
 {
+    function UpdateCandles() {
+        print("CandlesController: update -----------------------------------");
+        foreach (target, state in g_candles_targets) {
+            if (state & eCandleState.kInvalid) continue;
+            if (state & eCandleState.kChanged) {
+                if (state & eCandleState.kFocused) {
+                    SendMessage(target, "BeginVisible");
+                } else {
+                    SendMessage(target, "EndVisible");
+                }
+                state = state & ~eCandleState.kChanged;
+                g_candles_targets[target] = state;
+            }
+        }
+        Property.Set(self, "StTweqBlink", "AnimS", 0);
+    }
+
     function destructor() {
         // to be on the safe side make really sure the handler is removed
         // when this script is destroyed (calling RemoveHandler if it's already
@@ -152,26 +178,27 @@ class CandlesController extends SqRootScript
 
     function OnTweqComplete() {
         if (message().Type==eTweqType.kTweqTypeFlicker) {
-            print("CandlesController: update");
-            foreach (target, state in g_candles_overlay.m_targets) {
-                // TODO: do something about the target.
-            }
-            g_candles_overlay.ClearChanged();
-            Property.Set(self, "StTweqBlink", "AnimS", 0);
+            UpdateCandles();
         }
     }
 }
 
 class ActiveCandle extends SqRootScript {
     function OnBeginScript() {
-        g_candles_overlay.EnableTarget(self, true);
+        EnableCandle(self, true);
     }
 
     function OnEndScript() {
-        g_candles_overlay.EnableTarget(self, false);
+        EnableCandle(self, false);
     }
 
-    // TODO: do something with this
-            // // We were drawn.
-            // DarkUI.TextMessage("OnScreen", 0x0080FF, 100);
+    function OnBeginVisible() {
+        print(self+" "+message().message);
+        DarkUI.TextMessage("Visible", 0x0080FF, 10000);
+    }
+
+    function OnEndVisible() {
+        print(self+" "+message().message);
+        DarkUI.TextMessage("", 0, 1);
+    }
 }
