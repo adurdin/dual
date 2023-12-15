@@ -183,9 +183,46 @@ class ActiveCandle extends SqRootScript {
         EnableCandle(self, false);
     }
 
+    function GetCounterpart() {
+        local link = Link.GetOne("Owns", self);
+        if (link) {
+            return LinkDest(link);
+        } else {
+            // TODO: this is no good at all, because we want the candles, even
+            //       their counterparts, to have lights! so they need to exist
+            //       in the editor!!! -- but for now this will work, we can
+            //       manually create the counterparts and set up Owns links
+            //       in the editor without breaking this script.
+            local arch = Object.Archetype(self);
+            local counterpart = Object.BeginCreate(arch);
+            // TODO: pull relative positioning from DualController? or not, if
+            //       all the counterparts are manually created, then we dont
+            //       need this branch.
+            Object.Teleport(counterpart, vector(0,0,512), vector(), self);
+            Property.SetSimple(counterpart, "RenderAlpha", 0.0);
+            Property.SetSimple(counterpart, "HasRefs", false);
+            // TODO: physics???
+            Object.EndCreate(counterpart);
+            Link.Create("Owns", self, counterpart);
+        }
+    }
+
+    function OnSim() {
+        if (message().starting) {
+            // Make sure the counterpart exists, so that we don't create huge
+            // numbers of them late in the mission and maybe trip over object
+            // limits then. If we are gonna hit limits, the earlier the better.
+            GetCounterpart();
+        }
+    }
+
     function OnBeginVisible() {
         print(self+" "+message().message);
         DarkUI.TextMessage("Visible", 0x0080FF, 10000);
+
+        local counterpart = GetCounterpart();
+        Property.SetSimple(counterpart, "HasRefs", true);
+        Property.SetSimple(counterpart, "RenderAlpha", 1.0);
     }
 
     function OnEndVisible() {
