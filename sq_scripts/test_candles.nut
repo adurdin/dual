@@ -1,137 +1,177 @@
-class DebugOnscreen extends SqRootScript {
-    function OnTweqComplete() {
-        if (message().Type==eTweqType.kTweqTypeFlicker) {
-            // We were drawn.
-            DarkUI.TextMessage("OnScreen", 0x0080FF, 100);
-        }
-    }
-}
-
 // We're not drawing a HUD, but we're using the HUD api to get screen positions
 // and to determine if the object in question is onscreen or not!
-class DebugRenderInfoOverlay extends IDarkOverlayHandler
-{
-    m_target = 0;
-    m_target_is_focused = 0;
 
-    // keep these intrefs around so we dont create garbage every frame.
+enum eCandleState {
+    kFocused = 0x01,    // candle was in view on last update.
+    kChanged = 0x02,    // candle focused state changed on last update.
+    kInvalid = 0x10,    // either disabled, or the object id is no longer valid.
+}
+
+class CandlesOverlay extends IDarkOverlayHandler
+{
+    debug_draw_rects = true;
+
+    // The CandlesController.
+    m_controller = 0;
+
+    // Targets: a dict of (objid -> eCandleState).
+    m_targets = {};
+
+    // keep these intrefs around so we dont allocate them every frame.
     rx1 = int_ref();
     ry1 = int_ref();
     rx2 = int_ref();
     ry2 = int_ref();
 
-    // handle to transparent hud overlay items
-    xhair_handle = 0;
-    corner_handles = [];
+    function Init(controller) {
+        m_controller = controller;
+    }
 
-    function constructor() {
-        local bm = DarkOverlay.GetBitmap("debugxhair", "hud\\");
-        xhair_handle = DarkOverlay.CreateTOverlayItemFromBitmap(0, 0, 255, bm, true);
-        for (local i=0; i<4; i++) {
-            bm = DarkOverlay.GetBitmap("debugframe"+i, "hud\\");
-            corner_handles.append( DarkOverlay.CreateTOverlayItemFromBitmap(0, 0, 255, bm, true) );
+    function EnableTarget(target, enable) {
+        if (target in m_targets) {
+            local state = m_targets[target];
+            state = state  & ~eCandleState.kInvalid;
+            m_targets[target] = state;
+        } else {
+            m_targets[target] <- 0;
         }
-
-        base.constructor();
-    }
-   
-
-    function Init(target) {
-        m_target = target;
-        m_target_is_focused = false;
     }
 
-    // IDarkOverlayHandler interface
+    function ClearChanged() {
+        foreach (target, state in m_targets) {
+            state = state & ~eCandleState.kChanged;
+            m_targets[target] = state;
+        }
+    }
 
     function DrawHUD() {
-        if (m_target==0) return;
+        // TODO: will need this later to make the 'in view' decision resolution-independent.
+        // Engine.GetCanvasSize(rx1, ry1);
+        // local screenWidth = rx1.tofloat();
+        // local screenHeight = ry1.tofloat();
 
-        Engine.GetCanvasSize(rx1, ry1);
-        local w = rx1.tofloat();
-        local h = ry1.tofloat();
-        local visible = DarkOverlay.GetObjectScreenBounds(m_target, rx1, ry1, rx2, ry2);
-        // local playerPos = Object.Position(Object.Named("Player"));
-        // local targetPos = Object.Position(m_target);
-        // local distance = (targetPos-playerPos).Length();
-        // const MAX_RANGE = 16.0;
-        // const MIN_RANGE = 2.0;
-        // local proximity = (MIN_RANGE+MAX_RANGE-distance)/MAX_RANGE;
-        // if (proximity<0.0) proximity = 0.0;
-        // if (proximity>0.999) proximity = 0.999;
-        local was_focused = m_target_is_focused;
-        local is_focused = false;
-        if (visible) { // || proximity>0.0) {
-            local x1 = rx1.tointeger();
-            local y1 = ry1.tointeger();
-            local x2 = rx2.tointeger();
-            local y2 = ry2.tointeger();
-            // Hardcode a rect that covers the bulk of the periapt in its animation.
-            // TODO: This is not a good approach to "was this rendered in the periapt"?
-            //       firstly because its not resolution-independent yet. secondly
-            //       because its not aspect-ratio independent (where does the periapt
-            //       show  up in 4:3? in 21:9? who knows?). thirdly because it is just
-            //       a rect that doesnt fully align ever with the periapt. but for now
-            //       it is enough to test the rest of the thing with.
-            local in_rect = (x1>=1143 && x2<1655 && y1>=421 && y2<824);
-            if (in_rect) {
-                //DarkUI.TextMessage("In Rect", 0xFF00FF, 100);
-                is_focused = true;
-            }
-            //print("visible at "+x1+","+y1+" - "+x2+","+y2+(in_rect?" IN RECT":""));
-            DarkOverlay.UpdateTOverlayPosition(xhair_handle, x1+(x2-x1)/2-8, y1+(y2-y1)/2-8);
-            DarkOverlay.UpdateTOverlayPosition(corner_handles[0], x1, y1);
-            DarkOverlay.UpdateTOverlayPosition(corner_handles[1], x2-8, y1);
-            DarkOverlay.UpdateTOverlayPosition(corner_handles[2], x2-8, y2-8);
-            DarkOverlay.UpdateTOverlayPosition(corner_handles[3], x1, y2-8);
-            // DarkOverlay.DrawTOverlayItem(xhair_handle);
-            // for (local i=0; i<4; i++) {
-            //     DarkOverlay.DrawTOverlayItem(corner_handles[i]);
-            // }
-            DarkOverlay.SetTextColor(255, 0, 255);
-            DarkOverlay.DrawLine(x1, y1, x2, y1);
-            DarkOverlay.DrawLine(x2, y1, x2, y2);
-            DarkOverlay.DrawLine(x1, y1, x1, y2);
-            DarkOverlay.DrawLine(x1, y2, x2, y2);
-        } else {
-            //print("not visible.");
+        // Hardcode a rect that covers the bulk of the periapt in its animation.
+        // TODO: This is not a good approach to "was this rendered in the periapt"?
+        //       firstly because its not resolution-independent yet. secondly
+        //       because its not aspect-ratio independent (where does the periapt
+        //       show  up in 4:3? in 21:9? who knows?). thirdly because it is just
+        //       a rect that doesnt fully align ever with the periapt. but for now
+        //       it is enough to test the rest of the thing with.
+        const rect_x1 = 1143;
+        const rect_x2 = 1655;
+        const rect_y1 = 421;
+        const rect_y2 = 824;
+        if (debug_draw_rects) {
+            DarkOverlay.SetTextColor(64, 0, 64);
+            DarkOverlay.DrawLine(rect_x1, rect_y1, rect_x2, rect_y1);
+            DarkOverlay.DrawLine(rect_x2, rect_y1, rect_x2, rect_y2);
+            DarkOverlay.DrawLine(rect_x1, rect_y1, rect_x1, rect_y2);
+            DarkOverlay.DrawLine(rect_x1, rect_y2, rect_x2, rect_y2);
+
         }
 
-        if (is_focused!=was_focused) {
-            m_target_is_focused = is_focused;
-            // TODO: i dont like this. i would much rather send a message to
-            //       the object. but from inside the hud, we can't, because
-            //       the overlay is only a squirrel instance. We would have to
-            //       have another concrete object that on flicker (or every
-            //       frame timer) looks at g_overlay.m_target_is_focused and
-            //       dispatches the appropriate messages... gross.
-            if (is_focused) {
-                Property.Set(m_target, "StTweqBlink", "AnimS", TWEQ_AS_ONOFF);
-            } else {
-                Property.Set(m_target, "StTweqBlink", "AnimS", 0);
+        local any_changed = false;
+        foreach (target, state in m_targets) {
+            if (state & eCandleState.kInvalid) {
+                continue;
             }
+            if (! Object.Exists(target)) {
+                m_targets[target] = eCandleState.kInvalid;
+                continue;
+            }
+            local visible = DarkOverlay.GetObjectScreenBounds(target, rx1, ry1, rx2, ry2);
+            local was_focused = (state & eCandleState.kFocused)!=0;
+            local is_focused = false;
+            if (visible && !was_focused) {
+                local x1 = rx1.tointeger();
+                local y1 = ry1.tointeger();
+                local x2 = rx2.tointeger();
+                local y2 = ry2.tointeger();
+                local in_rect = (x1>=rect_x1 && x2<rect_x2 && y1>=rect_y1 && y2<rect_y2);
+                if (in_rect) {
+                    is_focused = true;
+                }
+                if (debug_draw_rects) {
+                    DarkOverlay.SetTextColor(255, 0, 255);
+                    DarkOverlay.DrawLine(x1, y1, x2, y1);
+                    DarkOverlay.DrawLine(x2, y1, x2, y2);
+                    DarkOverlay.DrawLine(x1, y1, x1, y2);
+                    DarkOverlay.DrawLine(x1, y2, x2, y2);
+                }
+            }
+
+            if (state & eCandleState.kFocused) {
+                if (state & eCandleState.kChanged) {
+                    // If it was focused in at least one frame between controller updates,
+                    // we leave it that way so the focusing doesn't get skipped.
+                    continue;
+                }
+            }
+
+            state = (is_focused? eCandleState.kFocused : 0);
+            if (is_focused!=was_focused) {
+                state = state|eCandleState.kChanged;
+                any_changed = true;
+            }
+            m_targets[target] = state;
+        }
+
+        if (m_controller && any_changed) {
+            print("CandlesOverlay: queue update");
+            Property.Set(m_controller, "StTweqBlink", "AnimS", TWEQ_AS_ONOFF);
         }
     }
 
-    //function DrawTOverlay() {}
+    // TODO: handle resolution changes and such.
+    // handler called by the engine when dark initializes UI components,
+    // this is also called when resuming game after in-game menu and other
+    // UI screens and is a good place to update positioning of HUD elements
+    // in case display resolution changed.
     //function OnUIEnterMode() {}
 }
 
-g_overlay <- DebugRenderInfoOverlay();
+g_candles_overlay <- CandlesOverlay();
 
-class DebugRenderInfo extends SqRootScript
+class CandlesController extends SqRootScript
 {
     function destructor() {
-        // to be on the safe side make really sure the handler is removed when this script is destroyed
-        // (calling RemoveHandler if it's already been removed is no problem)
-        DarkOverlay.RemoveHandler(g_overlay);
+        // to be on the safe side make really sure the handler is removed
+        // when this script is destroyed (calling RemoveHandler if it's already
+        // been removed is no problem)
+        DarkOverlay.RemoveHandler(g_candles_overlay);
     }
 
     function OnBeginScript() {
-        DarkOverlay.AddHandler(g_overlay);
-        g_overlay.Init(self);
+        g_candles_overlay.Init(self);
+        DarkOverlay.AddHandler(g_candles_overlay);
     }
 
     function OnEndScript() {
-        DarkOverlay.RemoveHandler(g_overlay);
+        DarkOverlay.RemoveHandler(g_candles_overlay);
     }
+
+    function OnTweqComplete() {
+        if (message().Type==eTweqType.kTweqTypeFlicker) {
+            print("CandlesController: update");
+            foreach (target, state in g_candles_overlay.m_targets) {
+                // TODO: do something about the target.
+            }
+            g_candles_overlay.ClearChanged();
+            Property.Set(self, "StTweqBlink", "AnimS", 0);
+        }
+    }
+}
+
+class ActiveCandle extends SqRootScript {
+    function OnBeginScript() {
+        g_candles_overlay.EnableTarget(self, true);
+    }
+
+    function OnEndScript() {
+        g_candles_overlay.EnableTarget(self, false);
+    }
+
+    // TODO: do something with this
+            // // We were drawn.
+            // DarkUI.TextMessage("OnScreen", 0x0080FF, 100);
 }
