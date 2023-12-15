@@ -12,7 +12,7 @@ g_candles_targets <- {};
 
 class CandlesOverlay extends IDarkOverlayHandler
 {
-    debug_draw_rects = true;
+    debug_draw_rects = false;
 
     // The CandlesController.
     m_controller = 0;
@@ -197,37 +197,8 @@ class ActiveCandle extends SqRootScript {
         return 0;
     }
 
-    function CreateCounterpart() {
-        local arch = Object.Archetype(self);
-        local counterpart = Object.BeginCreate(arch);
-        // TODO: pull relative positioning from DualController? or not, if
-        //       all the counterparts are manually created, then we dont
-        //       need this branch.
-        Object.Teleport(counterpart, vector(0,0,512), vector(), self);
-        Property.SetSimple(counterpart, "RenderAlpha", 0.0);
-        Property.SetSimple(counterpart, "HasRefs", false);
-        Property.Set(counterpart, "PhysType", "Type", 3); // None
-        Object.EndCreate(counterpart);
-        Link.Create("Owns", self, counterpart);
-        SendMessage(counterpart, "TurnOff");
-        return counterpart;
-    }
-
     function OnSim() {
         if (message().starting) {
-            // Make sure the counterpart exists, so that we don't create huge
-            // numbers of them late in the mission and maybe trip over object
-            // limits then. If we are gonna hit limits, the earlier the better.
-            //
-            // TODO: this is no good at all, because we want the candles, even
-            //       their counterparts, to have lights! so they need to exist
-            //       in the editor!!! -- but for now this will work, we can
-            //       manually create the counterparts and set up Owns links
-            //       in the editor without breaking this script.
-            
-            // TODO: delete this. we need to create counterparts in-editor.
-            //CreateCounterpart();
-
             local counterpart = GetCounterpart();
             if (counterpart) {
                 SendMessage(counterpart, "TurnOff");
@@ -244,9 +215,9 @@ class ActiveCandle extends SqRootScript {
         print(self+" "+message().message);
         SetData("Visible", true);
         DarkUI.TextMessage("Visible", 0x0080FF, 10000);
-
-        // local appear = GetData("Appear");
-        // if (appear>=1.0) return;
+        // NOTE: we always kick off the timer here, because we flag ourselves
+        //       as invalid once we are done, and wont get BeginVisible messages
+        //       anymore.
         SetOneShotTimer(self, "CandleAppear", kTimerIncrement);
     }
 
@@ -262,18 +233,21 @@ class ActiveCandle extends SqRootScript {
             if (! counterpart) return;
             local appear = GetData("Appear");
             local visible = GetData("Visible");
-            // TODO: adjust step size and incorporate actual time, and tune
-            //       timing and maybe curve?
+            // TODO: make framerate independent.
+            // TODO: tweak timing until it feels right.
             local step = (visible? 1.0 : -1.0)*0.005;
+            // TODO: audio feedback as appear starts rising/falling??
             appear += step;
             if (appear<0.0) appear = 0.0;
             if (appear>1.0) appear = 1.0;
             SetData("Appear", appear);
             DarkUI.TextMessage("appear:"+(appear*1000).tointeger(), 0xFF00FF, 100);
             Property.SetSimple(counterpart, "HasRefs", (appear>0.0));
+            // TODO: better alpha curve (and maybe ExtraLight, if AnimLight doesnt interfere?)
             Property.SetSimple(counterpart, "RenderAlpha", appear);
             if (appear>=1.0) {
                 // We are solid now, permanently.
+                // TODO: audio feedback.
                 SetData("AppearDone", true);
                 Property.Set(counterpart, "PhysType", "Type", 0); // OBB
                 EnableCandle(self, false);
@@ -282,6 +256,7 @@ class ActiveCandle extends SqRootScript {
             }
             if (appear<=0.0) {
                 // We are faded out. No need for another timer tick.
+                // TODO: silence rising/falling audio feedback (if any).
                 return;
             }
             SetOneShotTimer(self, "CandleAppear", kTimerIncrement);
