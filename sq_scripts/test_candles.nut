@@ -64,13 +64,10 @@ class CandlesOverlay extends IDarkOverlayHandler
                 g_candles_targets[target] = eCandleState.kInvalid;
                 continue;
             }
-            print("CandlesOverlay: updating "+target+":");
             local visible = DarkOverlay.GetObjectScreenBounds(target, rx1, ry1, rx2, ry2);
-            print("  visible:"+visible);
             local was_focused = (state & eCandleState.kFocused)!=0;
-            print("  was_focused:"+was_focused);
             local is_focused = false;
-            if (visible /* && !was_focused */) {
+            if (visible) {
                 local x1 = rx1.tointeger();
                 local y1 = ry1.tointeger();
                 local x2 = rx2.tointeger();
@@ -87,30 +84,25 @@ class CandlesOverlay extends IDarkOverlayHandler
                     DarkOverlay.DrawLine(x1, y2, x2, y2);
                 }
             }
-            print("  is_focused:"+is_focused);
-            print("  old state:"+state);
 
             if (was_focused==is_focused) {
                 // No change happened. Skip.
-                print("  no change; skipping state set.");
                 continue;
             }
             if ((state & eCandleState.kChanged) && was_focused) {
                 // If it was focused in at least one frame between controller updates,
                 // we leave it that way so the focusing doesn't get skipped.
-                print("  latched focus; skipping state set.");
                 continue;
             }
 
             any_changed = true;
             state = eCandleState.kChanged;
             if (is_focused) state = state | eCandleState.kFocused;
-            print("  new state:"+state);
             g_candles_targets[target] = state;
         }
 
-        if (m_controller && any_changed) {
-            print("CandlesOverlay: queue update");
+        if (any_changed) {
+            // Queue an update.
             Property.Set(m_controller, "StTweqBlink", "AnimS", TWEQ_AS_ONOFF);
         }
     }
@@ -144,7 +136,6 @@ EnableCandle <- function(target, enable) {
 class CandlesController extends SqRootScript
 {
     function UpdateCandles() {
-        print("CandlesController: update -----------------------------------");
         foreach (target, state in g_candles_targets) {
             if (state & eCandleState.kInvalid) continue;
             if (state & eCandleState.kChanged) {
