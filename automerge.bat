@@ -50,6 +50,7 @@ if exist %FMDIR%\_combined3.mis del %FMDIR%\_combined3.mis
 pushd %T2DIR%
 dromed.exe -fm=%FM% edit_script_StartUp=%script% mergename=%MISNAME% mergeoptim=1 mergelighting=0
 popd
+copy /y %T2DIR%\monolog.txt %FMDIR%\automerge_monolog.txt
 
 :startmerge
 if not exist %FMDIR%\_slice1.mis goto badmerge

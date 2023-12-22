@@ -6,8 +6,11 @@ startmis.sav
 temp.mis
 temp.gam
 query_results.txt
-/_*.mis
 /fam/**/*.pcx
+
+# Automerge intermediate output.
+/_*.mis
+/automerge_monolog.txt
 
 # Prevent Dark Object Viewer from crashing/being slow when browsing
 # this folder; ensure it finds this .png *before* it finds any .mis!
