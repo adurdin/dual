@@ -1,4 +1,4 @@
-; (for use with merge.bat)
+; (for use with automerge.bat)
 ;
 ; This script requires area brushes as ids 1, 2, 3.
 ; If you dont have the mission set up right, who knows what this will do?
@@ -48,6 +48,18 @@ ifdef mergeoptim optimize
 ;hots_state -1
 ;hots_state 0
 save_mission _slice3.mis
+
+brush_select 4
+hots_state 0
+hots_state -1
+compress_br_ids
+clear_surface_cache
+ifndef mergeoptim portalize
+ifdef mergeoptim optimize
+;brush_select 4
+;hots_state -1
+;hots_state 0
+save_mission _slice4.mis
 
 play_schema dinner_bell
 eval mergename mprint Merging complete.
