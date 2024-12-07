@@ -152,3 +152,4 @@ motionTag  Archaeologist        0  0.5
 motionTag  Swimming             0  3
 motionTag  Hopping              0  1
 motionTag  Baby                 0  5
+motionTag  Glued                1  0
